@@ -19,6 +19,7 @@ export function parseFilm(row: Record<string, string>, idx: number): BollywoodFi
     canonical_title: p(row.canonical_title),
     display_title: p(row.display_title),
     release_year: n(row.release_year) ?? 0,
+    release_month_num: n(row.release_month_num),
     primary_genre: p(row.primary_genre),
     director: p(row.director),
     lead_actor_1: p(row.lead_actor_1),

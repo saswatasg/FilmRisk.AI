@@ -64,6 +64,14 @@ export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskD
         mitigation: 'Upgrade lead or reduce budget to match talent tier',
       })
     }
+    if (dirData && dirData.adjustedWinRatePct < 35 && input.totalBudgetCr > 80) {
+      factors.push({
+        factor: 'Director-Budget Gap',
+        severity: 'moderate',
+        description: `₹${input.totalBudgetCr}Cr budget with ${input.directorTier}-tier director (~${dirData.adjustedWinRatePct}% adjusted WR)`,
+        mitigation: 'Upgrade director or reduce budget to match director tier',
+      })
+    }
   }
 
   const totalRights =
@@ -71,19 +79,32 @@ export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskD
     input.overseasRightsCr + input.brandRevenueCr
   const coverageRatio = input.totalBudgetCr > 0 ? totalRights / input.totalBudgetCr : 0
 
-  if (coverageRatio < 0.3) {
+  const criticalThreshold = input.totalBudgetCr > 100 ? 0.20 : input.totalBudgetCr > 30 ? 0.25 : 0.30
+  const warningThreshold = input.totalBudgetCr > 100 ? 0.40 : input.totalBudgetCr > 30 ? 0.50 : 0.60
+
+  if (coverageRatio < criticalThreshold) {
     factors.push({
       factor: 'Critical Pre-Sale Gap',
       severity: 'critical',
       description: `Only ${Math.round(coverageRatio * 100)}% budget covered (₹${totalRights.toFixed(1)}Cr / ₹${input.totalBudgetCr.toFixed(1)}Cr) — insufficient to mitigate production risk`,
-      mitigation: 'Minimum 50% pre-sale coverage required; prioritize OTT and satellite deals before greenlight',
+      mitigation: `Minimum ${Math.round(criticalThreshold * 100)}% pre-sale coverage required; prioritize OTT and satellite deals before greenlight`,
     })
-  } else if (coverageRatio < 0.6) {
+  } else if (coverageRatio < warningThreshold) {
     factors.push({
       factor: 'Moderate Pre-Sale Gap',
       severity: 'high',
       description: `${Math.round(coverageRatio * 100)}% covered — ₹${(input.totalBudgetCr - totalRights).toFixed(1)}Cr unsecured`,
-      mitigation: 'Target 60%+ coverage; explore brand integrations and overseas territory advances',
+      mitigation: `Target ${Math.round(warningThreshold * 100)}%+ coverage; explore brand integrations and overseas territory advances`,
+    })
+  }
+
+  const ms = stats.monthStats[input.releaseMonth]
+  if (ms && ms.count >= 3 && ms.adjustedWinRatePct < 40) {
+    factors.push({
+      factor: 'Weak Release Month',
+      severity: 'moderate',
+      description: `${monthName(input.releaseMonth)}: ${ms.adjustedWinRatePct}% adjusted WR (${ms.count} films) — historically underperforms`,
+      mitigation: 'Move release to a stronger month (e.g., Diwali, Eid, or Christmas window)',
     })
   }
 
@@ -127,9 +148,11 @@ export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskD
     }
   }
 
-  const critical = factors.filter(f => f.severity === 'critical').length
-  const high = factors.filter(f => f.severity === 'high').length
-  const overallRisk = critical > 0 ? 'very_high' : high >= 3 ? 'high' : high >= 1 ? 'moderate' : 'low'
+  const severityScore: Record<string, number> = { critical: 4, high: 3, moderate: 2, low: 1 }
+  const totalSeverity = factors.reduce((s, f) => s + severityScore[f.severity], 0)
+  const maxSeverity = Math.max(...factors.map(f => severityScore[f.severity]), 0)
+
+  const overallRisk = maxSeverity >= 4 ? 'very_high' : totalSeverity >= 8 ? 'high' : totalSeverity >= 3 ? 'moderate' : 'low'
 
   const recommendations: string[] = []
   const bySeverity = ['critical', 'high', 'moderate', 'low']
@@ -148,6 +171,11 @@ export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskD
   }
 
   return { overallRisk, factors, topRecommendations: recommendations }
+}
+
+function monthName(m: number): string {
+  const names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return names[m] ?? `Month ${m}`
 }
 
 function budgetBand(b: number): string {

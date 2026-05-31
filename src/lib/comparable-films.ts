@@ -11,6 +11,8 @@ const WEIGHTS = {
   directorScore: 0.05,
 }
 
+const TIER_RANK: Record<string, number> = { A: 4, B: 3, C: 2, D: 1 }
+
 export function findComparableFilms(
   input: EvaluationInput,
   films: BollywoodFilm[],
@@ -25,8 +27,8 @@ export function findComparableFilms(
 
     const gs = genreSimilarity(input.primaryGenre, film.primary_genre)
     const bs = budgetSimilarity(input.totalBudgetCr, film.budget_cr)
-    const actorTierSim = input.actorTier === film.actor_tier_proxy ? 1 : 0.3
-    const dirTierSim = input.directorTier === film.director_tier_proxy ? 1 : 0.3
+    const actorTierSim = tierDistance(input.actorTier, film.actor_tier_proxy)
+    const dirTierSim = tierDistance(input.directorTier, film.director_tier_proxy)
     const ys = yearRecency(film.release_year)
     const actorSc = actorScoreSimilarity(input, film)
     const dirSc = dirScoreSimilarity(input, film)
@@ -64,6 +66,18 @@ export function findComparableFilms(
     })),
     querySummary: `${input.primaryGenre} · ₹${input.totalBudgetCr}Cr · ${input.directorTier}-tier director · ${input.actorTier}-tier actor`,
   }
+}
+
+function tierDistance(t1: string, t2: string): number {
+  if (!t1 || !t2) return 0.2
+  if (t1 === t2) return 1
+  const r1 = TIER_RANK[t1] ?? 0
+  const r2 = TIER_RANK[t2] ?? 0
+  if (r1 === 0 || r2 === 0) return 0.2
+  const diff = Math.abs(r1 - r2)
+  if (diff === 1) return 0.7
+  if (diff === 2) return 0.4
+  return 0.2
 }
 
 function genreSimilarity(g1: string, g2: string): number {

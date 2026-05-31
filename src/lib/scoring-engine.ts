@@ -4,12 +4,13 @@ import type { DatasetStats } from './dataset-stats'
 const W = {
   genreViability: 0.12,
   genreBudgetFit: 0.07,
-  budgetFeasibility: 0.17,
+  budgetFeasibility: 0.15,
   talentStrength: 0.18,
   preSaleCoverage: 0.22,
   conceptQuality: 0.10,
   marketTiming: 0.08,
-  productionViability: 0.06,
+  seasonality: 0.03,
+  productionViability: 0.05,
 }
 
 const FW = {
@@ -17,10 +18,11 @@ const FW = {
   genreRisk: 0.12,
   budgetRisk: 0.15,
   genreBudgetRisk: 0.08,
-  talentLiquidity: 0.15,
+  talentLiquidity: 0.14,
   conceptRisk: 0.10,
-  marketTiming: 0.09,
-  productionRisk: 0.06,
+  marketTiming: 0.07,
+  seasonalityRisk: 0.04,
+  productionRisk: 0.05,
 }
 
 function budgetBand(b: number): string {
@@ -81,7 +83,7 @@ function scoreTalentStrength(input: EvaluationInput, stats: DatasetStats): Score
   const combo = stats.comboStats[comboKey]
   if (combo && combo.count >= 2) {
     const wr = combo.adjustedWinRatePct
-    const score = Math.round(Math.min(wr, 90) / 90 * 10 * 10) / 10
+    const score = Math.round(Math.min(wr, 85) / 85 * 10 * 10) / 10
     return {
       label: 'Talent Strength', score, maxScore: 10, weight: W.talentStrength,
       contribution: score * W.talentStrength,
@@ -93,7 +95,7 @@ function scoreTalentStrength(input: EvaluationInput, stats: DatasetStats): Score
   const aWR = a ? a.adjustedWinRatePct : 25
   const dWR = d ? d.adjustedWinRatePct : 25
   const composite = Math.round(aWR * 0.45 + dWR * 0.55)
-  const score = Math.round(Math.min(composite, 80) / 80 * 10 * 10) / 10
+  const score = Math.round(Math.min(composite, 85) / 85 * 10 * 10) / 10
   return {
     label: 'Talent Strength', score, maxScore: 10, weight: W.talentStrength,
     contribution: score * W.talentStrength,
@@ -125,6 +127,25 @@ function scoreConceptQuality(input: EvaluationInput): ScoreComponent {
     contribution: score * W.conceptQuality,
     explanation: `Clarity ${input.conceptClarity}/10, Novelty ${input.novelty}/10`,
   }
+}
+
+function scoreSeasonality(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
+  const ms = stats.monthStats[input.releaseMonth]
+  if (!ms || ms.count < 3) {
+    return { label: 'Seasonality', score: 6, maxScore: 10, weight: W.seasonality, contribution: 6 * W.seasonality, explanation: `${monthName(input.releaseMonth)}: insufficient data` }
+  }
+  const wr = ms.adjustedWinRatePct
+  const score = Math.round(Math.min(wr, 80) / 80 * 10 * 10) / 10
+  return {
+    label: 'Seasonality', score, maxScore: 10, weight: W.seasonality,
+    contribution: score * W.seasonality,
+    explanation: `${monthName(input.releaseMonth)}: ${ms.winRatePct}% raw → ${wr}% adjusted (${ms.count} films, avg ${ms.avgMultiple}x)`,
+  }
+}
+
+function monthName(m: number): string {
+  const names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return names[m] ?? `Month ${m}`
 }
 
 function scoreMarketTiming(input: EvaluationInput): ScoreComponent {
@@ -159,6 +180,7 @@ export function calculateGreenlightScore(input: EvaluationInput, stats: DatasetS
     scoreTalentStrength(input, stats),
     scorePreSaleCoverage(input),
     scoreConceptQuality(input),
+    scoreSeasonality(input, stats),
     scoreMarketTiming(input),
     scoreProductionViability(input),
   ]
@@ -229,6 +251,17 @@ function finConceptRisk(input: EvaluationInput): ScoreComponent {
   }
 }
 
+function finSeasonalityRisk(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
+  const ms = stats.monthStats[input.releaseMonth]
+  const wr = ms ? ms.adjustedWinRatePct : 45
+  const inverted = Math.round(Math.min(100 - wr, 80) / 80 * 10 * 10) / 10
+  return {
+    label: 'Seasonality Risk', score: 10 - inverted, maxScore: 10, weight: FW.seasonalityRisk,
+    contribution: (10 - inverted) * FW.seasonalityRisk,
+    explanation: `${monthName(input.releaseMonth)}: ${wr}% adjusted WR`,
+  }
+}
+
 function finMarketTiming(input: EvaluationInput): ScoreComponent {
   const scores: Record<string, number> = { strong: 9, neutral: 6, weak: 3 }
   const score = scores[input.marketTiming] ?? 6
@@ -257,6 +290,7 @@ export function calculateFinancierRisk(input: EvaluationInput, stats: DatasetSta
     finGenreBudgetRisk(input, stats),
     finTalentLiquidity(input, stats),
     finConceptRisk(input),
+    finSeasonalityRisk(input, stats),
     finMarketTiming(input),
     finProductionRisk(input),
   ]

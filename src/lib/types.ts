@@ -3,6 +3,7 @@ export interface BollywoodFilm {
   canonical_title: string
   display_title: string
   release_year: number
+  release_month_num: number | null
   primary_genre: string
   director: string
   lead_actor_1: string
@@ -46,6 +47,7 @@ export interface EvaluationInput {
   financingCostCr: number
   theatricalSharePercent: number
   marketTiming: 'strong' | 'neutral' | 'weak'
+  releaseMonth: number
 }
 
 export interface ScoreComponent {

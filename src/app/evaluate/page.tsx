@@ -14,6 +14,15 @@ import { Loader2, ChevronRight, Users, Banknote, FileText } from 'lucide-react'
 import type { EvaluationInput, EvaluationResult } from '@/lib/types'
 import { EvaluationResults } from './results'
 
+const MONTHS = [
+  { value: 1, label: 'January' }, { value: 2, label: 'February' },
+  { value: 3, label: 'March' }, { value: 4, label: 'April' },
+  { value: 5, label: 'May' }, { value: 6, label: 'June' },
+  { value: 7, label: 'July' }, { value: 8, label: 'August' },
+  { value: 9, label: 'September' }, { value: 10, label: 'October' },
+  { value: 11, label: 'November' }, { value: 12, label: 'December' },
+]
+
 const GENRES = [
   'Action', 'Comedy', 'Drama', 'Romance', 'Thriller', 'Horror', 'Musical',
   'Biopic', 'Biography', 'Crime', 'Fantasy', 'Social', 'Mystery', 'Adventure',
@@ -45,6 +54,7 @@ function defaultInput(): EvaluationInput {
     financingCostCr: 0,
     theatricalSharePercent: 40,
     marketTiming: 'neutral',
+    releaseMonth: 6,
   }
 }
 
@@ -153,6 +163,15 @@ export default function EvaluatePage() {
               <Separator />
 
               <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Release Month</Label>
+                  <Select value={String(input.releaseMonth)} onValueChange={v => { const val = parseInt(v || '6'); update('releaseMonth', isNaN(val) ? 6 : val) }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {MONTHS.map(m => <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="space-y-2">
                   <Label>Market Timing</Label>
                   <Select value={input.marketTiming} onValueChange={v => selectUpdate('marketTiming', v)}>

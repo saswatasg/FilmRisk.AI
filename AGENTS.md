@@ -4,6 +4,32 @@
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
 
+<!-- BEGIN:backtest-results -->
+# Honest Backtest Results
+
+## Methodological changes from earlier versions
+- **Time-series split**: Train ≤ 2022, test > 2022 (not in-sample)
+- **Bayesian shrinkage**: Uses actual (unweighted) counts — NOT temporally-inflated counts
+- **Seasonality**: 3% weight added, scored from release_month_num stats
+- **Pre-sale caveat**: 22% weight component is estimated from budget bands (CSV has no pre-sale data)
+
+## Out-of-Sample Performance (2023-2025, n=30)
+| Metric | In-sample (old) | OOS (current) |
+|--------|----------------|---------------|
+| Greenlight Precision | 93.9% | **85.7%** |
+| Greenlight Recall | 45.9% | **22.2%** |
+| False Positive Rate | 6.1% | **14.3%** |
+| Don't Invest Pred | 5.5% | **0%** |
+
+## Key Takeaways
+- 85.7% precision is legitimate and useful for capital allocation
+- The model is conservative — most test films (23/30) score CONDITIONAL
+- 0 Don't Invest calls in 2023-2025 suggests thresholds (75/50) may need recalibration
+- Many BLOCKBUSTER/HIT films in 2023-2025 score CONDITIONAL (59-74 range) — false negatives
+- In production, the model would train on all data up to today, improving recall
+- Small test set (n=30) limits statistical confidence
+<!-- END:backtest-results -->
+
 <!-- BEGIN:filmrisk-research -->
 # Bollywood Investment Research (2025)
 

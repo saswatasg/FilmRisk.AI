@@ -35,6 +35,13 @@ export interface GenreBudgetInteraction {
   avgMultiple: number
 }
 
+export interface MonthStats {
+  count: number
+  winRatePct: number
+  adjustedWinRatePct: number
+  avgMultiple: number
+}
+
 export interface DatasetStats {
   genreStats: Record<string, GenreStats>
   actorTierStats: Record<string, TierStats>
@@ -42,6 +49,7 @@ export interface DatasetStats {
   comboStats: Record<string, { count: number; winRatePct: number; adjustedWinRatePct: number; avgMultiple: number }>
   budgetBandStats: Record<string, BudgetBandStats>
   genreBudgetStats: Record<string, GenreBudgetInteraction>
+  monthStats: Record<number, MonthStats>
   grossMultiplePercentiles: { p10: number; p25: number; p50: number; p75: number; p90: number }
 }
 
@@ -70,12 +78,13 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
   const withFinance = films.filter(f => f.budget_cr !== null && f.budget_cr > 0)
   const allMultiples: number[] = []
 
-  const genreRaw: Record<string, { wins: number; total: number; weightedBudget: number; weightedMultSum: number; weightedCount: number }> = {}
-  const actorRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; scoreSum: number }> = {}
-  const dirRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; scoreSum: number }> = {}
-  const bandRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number }> = {}
-  const genreBudgetRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number }> = {}
-  const comboRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number }> = {}
+  const genreRaw: Record<string, { wins: number; total: number; weightedBudget: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number }> = {}
+  const actorRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; scoreSum: number; actualWins: number; actualCount: number }> = {}
+  const dirRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; scoreSum: number; actualWins: number; actualCount: number }> = {}
+  const bandRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number }> = {}
+  const genreBudgetRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number }> = {}
+  const comboRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number }> = {}
+  const monthRaw: Record<number, { wins: number; total: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number }> = {}
 
   for (const f of withFinance) {
     const b = f.budget_cr!
@@ -88,60 +97,79 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
     const at = f.actor_tier_proxy
     const dt = f.director_tier_proxy
     const band = budgetBand(b)
+    const month = f.release_month_num
 
-    if (!genreRaw[genre]) genreRaw[genre] = { wins: 0, total: 0, weightedBudget: 0, weightedMultSum: 0, weightedCount: 0 }
+    if (!genreRaw[genre]) genreRaw[genre] = { wins: 0, total: 0, weightedBudget: 0, weightedMultSum: 0, weightedCount: 0, actualWins: 0, actualCount: 0 }
     genreRaw[genre].total += wt
     genreRaw[genre].weightedBudget += b * wt
     genreRaw[genre].weightedCount += wt
 
+    if (month !== null) {
+      if (!monthRaw[month]) monthRaw[month] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, actualWins: 0, actualCount: 0 }
+      monthRaw[month].total += wt
+      monthRaw[month].weightedCount += wt
+    }
+
     if (g !== null && g > 0 && mult !== null) {
       genreRaw[genre].weightedMultSum += mult * wt
-      if (mult >= 1.5) genreRaw[genre].wins += wt
+      if (mult >= 1.5) { genreRaw[genre].wins += wt; genreRaw[genre].actualWins += 1 }
+      genreRaw[genre].actualCount += 1
       allMultiples.push(mult)
 
-      if (!bandRaw[band]) bandRaw[band] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0 }
+      if (!bandRaw[band]) bandRaw[band] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, actualWins: 0, actualCount: 0 }
       bandRaw[band].total += wt
       bandRaw[band].weightedMultSum += mult * wt
       bandRaw[band].weightedCount += wt
-      if (mult >= 1.5) bandRaw[band].wins += wt
+      if (mult >= 1.5) { bandRaw[band].wins += wt; bandRaw[band].actualWins += 1 }
+      bandRaw[band].actualCount += 1
 
       const gbKey = `${genre}|${band}`
-      if (!genreBudgetRaw[gbKey]) genreBudgetRaw[gbKey] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0 }
+      if (!genreBudgetRaw[gbKey]) genreBudgetRaw[gbKey] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, actualWins: 0, actualCount: 0 }
       genreBudgetRaw[gbKey].total += wt
       genreBudgetRaw[gbKey].weightedMultSum += mult * wt
       genreBudgetRaw[gbKey].weightedCount += wt
-      if (mult >= 1.5) genreBudgetRaw[gbKey].wins += wt
+      if (mult >= 1.5) { genreBudgetRaw[gbKey].wins += wt; genreBudgetRaw[gbKey].actualWins += 1 }
+      genreBudgetRaw[gbKey].actualCount += 1
+
+      if (month !== null) {
+        monthRaw[month].weightedMultSum += mult * wt
+        if (mult >= 1.5) { monthRaw[month].wins += wt; monthRaw[month].actualWins += 1 }
+        monthRaw[month].actualCount += 1
+      }
     }
 
     if (at) {
-      if (!actorRaw[at]) actorRaw[at] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, scoreSum: 0 }
+      if (!actorRaw[at]) actorRaw[at] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, scoreSum: 0, actualWins: 0, actualCount: 0 }
       actorRaw[at].total += wt
       actorRaw[at].weightedCount += wt
       if (f.actor_rank_score !== null) actorRaw[at].scoreSum += f.actor_rank_score * wt
       if (mult !== null) {
         actorRaw[at].weightedMultSum += mult * wt
-        if (mult >= 1.5) actorRaw[at].wins += wt
+        if (mult >= 1.5) { actorRaw[at].wins += wt; actorRaw[at].actualWins += 1 }
+        actorRaw[at].actualCount += 1
       }
     }
 
     if (dt) {
-      if (!dirRaw[dt]) dirRaw[dt] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, scoreSum: 0 }
+      if (!dirRaw[dt]) dirRaw[dt] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, scoreSum: 0, actualWins: 0, actualCount: 0 }
       dirRaw[dt].total += wt
       dirRaw[dt].weightedCount += wt
       if (f.director_rank_score !== null) dirRaw[dt].scoreSum += f.director_rank_score * wt
       if (mult !== null) {
         dirRaw[dt].weightedMultSum += mult * wt
-        if (mult >= 1.5) dirRaw[dt].wins += wt
+        if (mult >= 1.5) { dirRaw[dt].wins += wt; dirRaw[dt].actualWins += 1 }
+        dirRaw[dt].actualCount += 1
       }
     }
 
     if (at && dt && mult !== null) {
       const key = `${dt}+${at}`
-      if (!comboRaw[key]) comboRaw[key] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0 }
+      if (!comboRaw[key]) comboRaw[key] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, actualWins: 0, actualCount: 0 }
       comboRaw[key].total += wt
       comboRaw[key].weightedMultSum += mult * wt
       comboRaw[key].weightedCount += wt
-      if (mult >= 1.5) comboRaw[key].wins += wt
+      if (mult >= 1.5) { comboRaw[key].wins += wt; comboRaw[key].actualWins += 1 }
+      comboRaw[key].actualCount += 1
     }
   }
 
@@ -154,7 +182,7 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
       avgBudget: r.weightedCount > 0 ? Math.round(r.weightedBudget / r.weightedCount) : 0,
       avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
       winRatePct: rawWR,
-      adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+      adjustedWinRatePct: bayesianWR(r.actualWins, r.actualCount),
     }
   }
 
@@ -165,7 +193,7 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
       withGross: Math.round(r.weightedCount),
       avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
       winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
-      adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+      adjustedWinRatePct: bayesianWR(r.actualWins, r.actualCount),
       avgScore: r.weightedCount > 0 ? Math.round((r.scoreSum / r.weightedCount) * 100) / 100 : 0,
     }
   }
@@ -177,7 +205,7 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
       withGross: Math.round(r.weightedCount),
       avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
       winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
-      adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+      adjustedWinRatePct: bayesianWR(r.actualWins, r.actualCount),
       avgScore: r.weightedCount > 0 ? Math.round((r.scoreSum / r.weightedCount) * 100) / 100 : 0,
     }
   }
@@ -187,7 +215,7 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
     bandStats[k] = {
       count: Math.round(r.weightedCount),
       winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
-      adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+      adjustedWinRatePct: bayesianWR(r.actualWins, r.actualCount),
       avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
     }
   }
@@ -197,7 +225,18 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
     genreBudgetStats[k] = {
       count: Math.round(r.weightedCount),
       winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
-      adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+      adjustedWinRatePct: bayesianWR(r.actualWins, r.actualCount),
+      avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
+    }
+  }
+
+  const monthStats: Record<number, MonthStats> = {}
+  for (const [k, r] of Object.entries(monthRaw)) {
+    const month = parseInt(k)
+    monthStats[month] = {
+      count: Math.round(r.weightedCount),
+      winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
+      adjustedWinRatePct: bayesianWR(r.actualWins, r.actualCount),
       avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
     }
   }
@@ -208,7 +247,7 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
       comboStats[k] = {
         count: Math.round(r.weightedCount),
         winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
-        adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+        adjustedWinRatePct: bayesianWR(r.actualWins, r.actualCount),
         avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
       }
     }
@@ -224,6 +263,7 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
     comboStats,
     budgetBandStats: bandStats,
     genreBudgetStats,
+    monthStats,
     grossMultiplePercentiles: {
       p10: sorted[Math.floor(len * 0.1)] ?? 0.17,
       p25: sorted[Math.floor(len * 0.25)] ?? 0.54,
