@@ -1,98 +1,100 @@
 import type { EvaluationInput, RiskDiagnosis, RiskFactor } from './types'
+import type { DatasetStats } from './dataset-stats'
 
-export function diagnoseRisk(input: EvaluationInput): RiskDiagnosis {
+export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskDiagnosis {
   const factors: RiskFactor[] = []
 
-  if (input.totalBudgetCr > 150) {
+  const band = budgetBand(input.totalBudgetCr)
+  const bandData = stats.budgetBandStats[band]
+  const winRate = bandData ? bandData.winRatePct : 30
+
+  if (winRate < 20) {
     factors.push({
-      factor: 'High Budget Exposure',
+      factor: 'High-Risk Budget Band',
       severity: 'high',
-      description: `₹${input.totalBudgetCr}Cr budget is in the top decile — recovery requires strong box office performance across all territories`,
-      mitigation: 'Strengthen pre-sale coverage to at least 60% before production start',
+      description: `₹${input.totalBudgetCr}Cr budget (${band} band) has only ${winRate}% historical success rate — majority of films at this budget level underperform`,
+      mitigation: 'Reduce budget to ₹30-60Cr range (37% success rate) or secure ≥60% pre-sale coverage before committing',
+    })
+  } else if (winRate < 40) {
+    factors.push({
+      factor: 'Below-Average Budget Band',
+      severity: 'moderate',
+      description: `${band} band: ${winRate}% historical win rate — below the ₹60-100Cr+ band averages`,
+      mitigation: 'Consider increasing budget to the next band for better economics, or secure strong pre-sales',
     })
   }
 
-  if (input.totalBudgetCr > 0 && input.totalBudgetCr < 10) {
+  const genreData = stats.genreStats[input.primaryGenre]
+  if (genreData && genreData.withGross >= 5) {
+    const genreWR = Math.round(genreData.avgMultiple >= 1.5 ? 50 : 25)
+    if (genreWR < 30 && input.totalBudgetCr > 60) {
+      factors.push({
+        factor: 'Genre-Budget Mismatch',
+        severity: 'high',
+        description: `${input.primaryGenre} (avg budget ₹${genreData.avgBudget}Cr, avg ${genreData.avgMultiple}x) with ₹${input.totalBudgetCr}Cr budget — genre historically underperforms at this scale`,
+        mitigation: 'Reduce budget to align with genre benchmarks, or pivot genre positioning',
+      })
+    }
+  }
+
+  const comboKey = `${input.directorTier}+${input.actorTier}`
+  const comboData = stats.comboStats[comboKey]
+  if (comboData && comboData.winRatePct < 40) {
     factors.push({
-      factor: 'Micro-Budget Constraints',
-      severity: 'moderate',
-      description: 'Sub-₹10Cr budget limits marketing reach and talent acquisition',
-      mitigation: 'Consider digital-first release strategy to maximize ROI',
+      factor: 'Weak Talent Combination',
+      severity: 'high',
+      description: `${input.directorTier}-tier director + ${input.actorTier}-tier actor combo has only ${comboData.winRatePct}% historical win rate (${comboData.count} films)`,
+      mitigation: 'Upgrade at least one talent tier to improve probability; consider A or B-tier lead for better pre-sale valuation',
     })
+  } else if (comboData && comboData.winRatePct >= 80) {
+    factors.push({
+      factor: 'Strong Talent Track Record',
+      severity: 'low',
+      description: `${input.directorTier}+${input.actorTier} combo shows ${comboData.winRatePct}% historical success — strong foundation`,
+      mitigation: 'Leverage combo for pre-sale negotiations; highlight in pitch deck',
+    })
+  }
+
+  if (!comboData && genreData && input.totalBudgetCr > 80) {
+    const actorData = stats.actorTierStats[input.actorTier]
+    const dirData = stats.directorTierStats[input.directorTier]
+    if (actorData && actorData.winRatePct < 30 && input.totalBudgetCr > 80) {
+      factors.push({
+        factor: 'Talent-Budget Gap',
+        severity: 'moderate',
+        description: `₹${input.totalBudgetCr}Cr budget with ${input.actorTier}-tier lead (${actorData.winRatePct}% success rate) — high budget requires stronger talent pull`,
+        mitigation: 'Upgrade to A or B-tier lead, or reduce budget to ₹60Cr to align with talent tier',
+      })
+    }
   }
 
   const totalRights =
-    (input.ottRightsCr ?? 0) +
-    (input.satelliteRightsCr ?? 0) +
-    (input.musicRightsCr ?? 0) +
-    (input.overseasRightsCr ?? 0) +
-    (input.brandRevenueCr ?? 0)
-
+    input.ottRightsCr + input.satelliteRightsCr + input.musicRightsCr +
+    input.overseasRightsCr + input.brandRevenueCr
   const coverageRatio = input.totalBudgetCr > 0 ? totalRights / input.totalBudgetCr : 0
 
   if (coverageRatio < 0.3) {
     factors.push({
-      factor: 'Low Pre-Sale Coverage',
+      factor: 'Critical Pre-Sale Gap',
       severity: 'critical',
-      description: `Only ${(coverageRatio * 100).toFixed(0)}% of budget covered by pre-sales (₹${totalRights.toFixed(1)}Cr / ₹${input.totalBudgetCr.toFixed(1)}Cr)`,
-      mitigation: 'Aggressively pursue OTT and satellite pre-sales before greenlight; consider co-production to share risk',
+      description: `Only ${Math.round(coverageRatio * 100)}% budget covered (₹${totalRights.toFixed(1)}Cr / ₹${input.totalBudgetCr.toFixed(1)}Cr) — insufficient to mitigate production risk`,
+      mitigation: 'Minimum 50% pre-sale coverage required; prioritize OTT and satellite deals before greenlight',
     })
   } else if (coverageRatio < 0.6) {
     factors.push({
-      factor: 'Moderate Pre-Sale Coverage',
+      factor: 'Moderate Pre-Sale Gap',
       severity: 'high',
-      description: `${(coverageRatio * 100).toFixed(0)}% covered — gap of ₹${(input.totalBudgetCr - totalRights).toFixed(1)}Cr remains at risk`,
-      mitigation: 'Target minimum 60% coverage; explore brand integrations and overseas territory advances',
+      description: `${Math.round(coverageRatio * 100)}% covered — ₹${(input.totalBudgetCr - totalRights).toFixed(1)}Cr unsecured`,
+      mitigation: 'Target 60%+ coverage; explore brand integrations and overseas territory advances',
     })
   }
 
-  if (input.actorTier && ['C', 'D', 'unknown'].includes(input.actorTier)) {
+  if (input.conceptClarity < 5 || input.novelty < 4) {
     factors.push({
-      factor: 'Limited Star Power',
-      severity: input.actorTier === 'unknown' ? 'high' : 'moderate',
-      description: `${input.leadActor1} (${input.actorTier}-tier) has limited box office pull — recovery depends on content strength`,
-      mitigation: 'Consider casting a higher-tier lead for better pre-sale valuation; strengthen script to compensate',
-    })
-  }
-
-  if (input.directorTier && ['C', 'D', 'unknown'].includes(input.directorTier)) {
-    factors.push({
-      factor: 'Inexperienced Director',
-      severity: input.directorTier === 'unknown' ? 'high' : 'moderate',
-      description: `${input.director} has limited track record — execution and delivery risk is elevated`,
-      mitigation: 'Pair with an experienced producer or co-director; ensure strong script supervision',
-    })
-  }
-
-  const highRiskGenres = ['Horror', 'Sci-Fi', 'Fantasy', 'Documentary', 'Mythological']
-  if (highRiskGenres.includes(input.primaryGenre) && input.totalBudgetCr > 60) {
-    factors.push({
-      factor: 'Genre-Budget Mismatch',
+      factor: 'Weak Concept Foundation',
       severity: 'high',
-      description: `${input.primaryGenre} with ₹${input.totalBudgetCr}Cr budget is high-risk — these genres have limited recovery track records at this scale`,
-      mitigation: 'Reduce budget to ₹60Cr or lower, or secure minimum 70% pre-sale coverage before proceeding',
-    })
-  }
-
-  const prodRatio = input.totalBudgetCr > 0
-    ? input.productionBudgetCr / input.totalBudgetCr
-    : 0
-
-  if (prodRatio > 0.8) {
-    factors.push({
-      factor: 'Under-allocated P&A Budget',
-      severity: 'high',
-      description: `Production consumes ${(prodRatio * 100).toFixed(0)}% of budget — P&A at ${((1 - prodRatio) * 100).toFixed(0)}% may be insufficient for theatrical release`,
-      mitigation: 'Reallocate budget to minimum 20% P&A; consider partner for marketing costs',
-    })
-  }
-
-  if (prodRatio < 0.3 && input.totalBudgetCr > 20) {
-    factors.push({
-      factor: 'Over-allocated P&A / Overheads',
-      severity: 'moderate',
-      description: `Only ${(prodRatio * 100).toFixed(0)}% allocated to production — check for inflated overhead or distribution fees`,
-      mitigation: 'Review cost structure; ensure production quality is not compromised by overheads',
+      description: `Concept clarity ${input.conceptClarity}/10, novelty ${input.novelty}/10 — weak premise weakens all downstream projections`,
+      mitigation: 'Invest in script development and test with target audiences before greenlight',
     })
   }
 
@@ -100,75 +102,61 @@ export function diagnoseRisk(input: EvaluationInput): RiskDiagnosis {
     factors.push({
       factor: 'Insufficient Contingency',
       severity: 'moderate',
-      description: `${input.contingencyPercent}% contingency is below the 5-15% industry standard — no buffer for production overruns`,
+      description: `${input.contingencyPercent}% contingency below 5-15% industry standard`,
       mitigation: 'Increase contingency to minimum 5% of total budget',
     })
   }
 
-  if (input.marketTiming === 'weak') {
+  const prodRatio = input.totalBudgetCr > 0 ? input.productionBudgetCr / input.totalBudgetCr : 0
+  if (prodRatio > 0.8) {
     factors.push({
-      factor: 'Unfavorable Release Window',
+      factor: 'Under-allocated P&A',
       severity: 'moderate',
-      description: 'Crowded release calendar or off-season timing may suppress opening weekend',
-      mitigation: 'Consider shifting release date; secure extra marketing spend to cut through competition',
+      description: `Production at ${Math.round(prodRatio * 100)}% of budget — P&A at ${Math.round((1 - prodRatio) * 100)}% may limit theatrical reach`,
+      mitigation: 'Reallocate to minimum 20% P&A for competitive release',
     })
   }
 
   if (input.financingCostCr > 0 && input.totalBudgetCr > 0) {
-    const costRatio = input.financingCostCr / input.totalBudgetCr
-    if (costRatio > 0.15) {
+    const finRatio = input.financingCostCr / input.totalBudgetCr
+    if (finRatio > 0.15) {
       factors.push({
         factor: 'High Financing Cost',
-        severity: 'high',
-        description: `Financing cost of ${(costRatio * 100).toFixed(0)}% of budget significantly erodes potential returns`,
-        mitigation: 'Explore alternative financing with lower cost; negotiate better terms against pre-sale collateral',
+        severity: 'moderate',
+        description: `Financing cost ${Math.round(finRatio * 100)}% of budget significantly erodes returns`,
+        mitigation: 'Seek alternative financing; negotiate better terms against pre-sale collateral',
       })
     }
   }
 
-  if (conceptIsWeak(input)) {
-    factors.push({
-      factor: 'Weak Concept Foundation',
-      severity: 'high',
-      description: `Low concept clarity (${input.conceptClarity}/10) or novelty (${input.novelty}/10) weakens every downstream risk factor`,
-      mitigation: 'Invest in script development; conduct test audiences; refine logline before committing talent',
-    })
-  }
+  const critical = factors.filter(f => f.severity === 'critical').length
+  const high = factors.filter(f => f.severity === 'high').length
+  const overallRisk = critical > 0 ? 'very_high' : high >= 3 ? 'high' : high >= 1 ? 'moderate' : 'low'
 
-  const criticalCount = factors.filter(f => f.severity === 'critical').length
-  const highCount = factors.filter(f => f.severity === 'high').length
-
-  const overallRisk = criticalCount > 0 ? 'very_high'
-    : highCount >= 3 ? 'high'
-      : highCount >= 1 ? 'moderate'
-        : 'low'
-
-  const topRecommendations = buildRecommendations(factors)
-
-  return { overallRisk, factors, topRecommendations }
-}
-
-function conceptIsWeak(input: EvaluationInput): boolean {
-  return input.conceptClarity < 5 || input.novelty < 4
-}
-
-function buildRecommendations(factors: RiskFactor[]): string[] {
-  const recs: string[] = []
-
-  const critical = factors.filter(f => f.severity === 'critical')
-  const high = factors.filter(f => f.severity === 'high')
-  const moderate = factors.filter(f => f.severity === 'moderate')
-
-  for (const f of [...critical, ...high, ...moderate]) {
-    if (!recs.includes(f.mitigation)) {
-      recs.push(f.mitigation)
+  const recommendations: string[] = []
+  const bySeverity = ['critical', 'high', 'moderate', 'low']
+  for (const sev of bySeverity) {
+    for (const f of factors) {
+      if (f.severity === sev && !recommendations.includes(f.mitigation)) {
+        recommendations.push(f.mitigation)
+      }
+      if (recommendations.length >= 5) break
     }
-    if (recs.length >= 5) break
+    if (recommendations.length >= 5) break
   }
 
-  if (recs.length === 0) {
-    recs.push('Project shows strong fundamentals — proceed with standard due diligence')
+  if (recommendations.length === 0) {
+    recommendations.push('Project shows strong fundamentals across all data-driven metrics — proceed with standard due diligence')
   }
 
-  return recs
+  return { overallRisk, factors, topRecommendations: recommendations }
+}
+
+function budgetBand(b: number): string {
+  if (b < 10) return '<10'
+  if (b < 30) return '10-30'
+  if (b < 60) return '30-60'
+  if (b < 100) return '60-100'
+  if (b < 200) return '100-200'
+  return '>200'
 }

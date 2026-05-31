@@ -10,14 +10,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, ChevronRight, Film, Users, Banknote, FileText } from 'lucide-react'
+import { Loader2, ChevronRight, Users, Banknote, FileText } from 'lucide-react'
 import type { EvaluationInput, EvaluationResult } from '@/lib/types'
 import { EvaluationResults } from './results'
 
 const GENRES = [
   'Action', 'Comedy', 'Drama', 'Romance', 'Thriller', 'Horror', 'Musical',
-  'Biopic', 'Historical', 'Sci-Fi', 'Fantasy', 'Crime', 'Social', 'Family',
-  'Animation', 'Documentary', 'Mythological',
+  'Biopic', 'Biography', 'Crime', 'Fantasy', 'Social', 'Mystery', 'Adventure',
+  'Animation', 'Sports', 'War',
 ]
 
 const TIERS = ['A', 'B', 'C', 'D']
@@ -26,18 +26,16 @@ function defaultInput(): EvaluationInput {
   return {
     filmTitle: '',
     primaryGenre: 'Drama',
-    secondaryGenre: '',
     logline: '',
     conceptClarity: 6,
     novelty: 5,
     director: '',
     leadActor1: '',
-    leadActor2: '',
     directorTier: 'C',
     actorTier: 'C',
     totalBudgetCr: 30,
-    pAndABudgetCr: 6,
     productionBudgetCr: 22,
+    pAndABudgetCr: 6,
     contingencyPercent: 10,
     ottRightsCr: 0,
     satelliteRightsCr: 0,
@@ -46,14 +44,7 @@ function defaultInput(): EvaluationInput {
     brandRevenueCr: 0,
     financingCostCr: 0,
     theatricalSharePercent: 50,
-    recoveryMultiple: 2.5,
-    isSequel: false,
-    isRemake: false,
-    hasFranchisePotential: false,
-    targetAudience: 'Mass',
     marketTiming: 'neutral',
-    productionHouse: '',
-    productionTeamScore: 6,
   }
 }
 
@@ -68,9 +59,7 @@ export default function EvaluatePage() {
   }
 
   function selectUpdate<K extends keyof EvaluationInput>(key: K, value: string | null) {
-    if (value !== null) {
-      update(key, value as EvaluationInput[K])
-    }
+    if (value !== null) update(key, value as EvaluationInput[K])
   }
 
   async function handleSubmit() {
@@ -104,7 +93,7 @@ export default function EvaluatePage() {
       <div className="mb-8">
         <h1 className="text-2xl font-semibold tracking-tight">Film Evaluation</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Fill in the project details below to receive a greenlight assessment, financier risk analysis, and financial projections.
+          Historical data-driven greenlight assessment using ~700 films with verified financials (2015–2025).
         </p>
       </div>
 
@@ -117,7 +106,10 @@ export default function EvaluatePage() {
 
         <TabsContent value="info" className="space-y-6">
           <Card>
-            <CardHeader><CardTitle>Film Information</CardTitle><CardDescription>Basic project details and concept assessment</CardDescription></CardHeader>
+            <CardHeader>
+              <CardTitle>Film Information</CardTitle>
+              <CardDescription>Genre, concept, and market timing — data-backed genre viability scoring</CardDescription>
+            </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -126,7 +118,7 @@ export default function EvaluatePage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Primary Genre</Label>
-                   <Select value={input.primaryGenre} onValueChange={v => selectUpdate('primaryGenre', v)}>
+                  <Select value={input.primaryGenre} onValueChange={v => selectUpdate('primaryGenre', v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {GENRES.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
@@ -138,7 +130,7 @@ export default function EvaluatePage() {
               <div className="space-y-2">
                 <Label>Logline / Concept Summary</Label>
                 <Textarea
-                  placeholder="Describe the film's premise, hook, and target audience in 2-3 sentences"
+                  placeholder="Describe the film's premise and audience hook in 2-3 sentences"
                   value={input.logline}
                   onChange={e => update('logline', e.target.value)}
                   rows={3}
@@ -148,40 +140,22 @@ export default function EvaluatePage() {
               <div className="grid gap-6 sm:grid-cols-2">
                 <div className="space-y-3">
                   <Label>Concept Clarity: {input.conceptClarity}/10</Label>
-                   <Slider min={1} max={10} value={[input.conceptClarity]} onValueChange={v => { const val = Array.isArray(v) ? v[0] : v; update('conceptClarity', val) }} />
+                  <Slider min={1} max={10} value={[input.conceptClarity]} onValueChange={v => { const val = Array.isArray(v) ? v[0] : v; update('conceptClarity', val) }} />
                   <p className="text-xs text-muted-foreground">{conceptClarityHint(input.conceptClarity)}</p>
                 </div>
                 <div className="space-y-3">
                   <Label>Novelty / Originality: {input.novelty}/10</Label>
-                   <Slider min={1} max={10} value={[input.novelty]} onValueChange={v => { const val = Array.isArray(v) ? v[0] : v; update('novelty', val) }} />
+                  <Slider min={1} max={10} value={[input.novelty]} onValueChange={v => { const val = Array.isArray(v) ? v[0] : v; update('novelty', val) }} />
                   <p className="text-xs text-muted-foreground">{noveltyHint(input.novelty)}</p>
                 </div>
               </div>
 
               <Separator />
 
-              <div className="grid gap-4 sm:grid-cols-3">
-                <LabelCheckbox checked={input.isSequel} onChange={v => update('isSequel', v)} label="Sequel / Franchise Entry" />
-                <LabelCheckbox checked={input.isRemake} onChange={v => update('isRemake', v)} label="Remake / Adaptation" />
-                <LabelCheckbox checked={input.hasFranchisePotential} onChange={v => update('hasFranchisePotential', v)} label="Franchise Potential" />
-              </div>
-
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Target Audience</Label>
-                   <Select value={input.targetAudience} onValueChange={v => selectUpdate('targetAudience', v)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Mass">Mass / Family</SelectItem>
-                      <SelectItem value="Urban">Urban / Premium</SelectItem>
-                      <SelectItem value="Youth">Youth</SelectItem>
-                      <SelectItem value="Niche">Niche / Festival</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
                   <Label>Market Timing</Label>
-                   <Select value={input.marketTiming} onValueChange={v => selectUpdate('marketTiming', v)}>
+                  <Select value={input.marketTiming} onValueChange={v => selectUpdate('marketTiming', v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="strong">Strong Window</SelectItem>
@@ -197,7 +171,10 @@ export default function EvaluatePage() {
 
         <TabsContent value="talent" className="space-y-6">
           <Card>
-            <CardHeader><CardTitle>Talent & Production Team</CardTitle><CardDescription>Key creative personnel and their market standing</CardDescription></CardHeader>
+            <CardHeader>
+              <CardTitle>Talent Configuration</CardTitle>
+              <CardDescription>Director and lead actor tiers — scored against historical combo win rates from the dataset</CardDescription>
+            </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -206,7 +183,7 @@ export default function EvaluatePage() {
                 </div>
                 <div className="space-y-2">
                   <Label>Director Tier</Label>
-                   <Select value={input.directorTier} onValueChange={v => selectUpdate('directorTier', v)}>
+                  <Select value={input.directorTier} onValueChange={v => selectUpdate('directorTier', v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {TIERS.map(t => <SelectItem key={t} value={t}>{t}-Tier</SelectItem>)}
@@ -218,12 +195,12 @@ export default function EvaluatePage() {
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Lead Actor 1</Label>
+                  <Label>Lead Actor</Label>
                   <Input placeholder="Lead actor name" value={input.leadActor1} onChange={e => update('leadActor1', e.target.value)} />
                 </div>
                 <div className="space-y-2">
-                  <Label>Lead Actor 1 Tier</Label>
-                   <Select value={input.actorTier} onValueChange={v => selectUpdate('actorTier', v)}>
+                  <Label>Actor Tier</Label>
+                  <Select value={input.actorTier} onValueChange={v => selectUpdate('actorTier', v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {TIERS.map(t => <SelectItem key={t} value={t}>{t}-Tier</SelectItem>)}
@@ -231,27 +208,6 @@ export default function EvaluatePage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Lead Actor 2 (optional)</Label>
-                  <Input placeholder="Second lead" value={input.leadActor2} onChange={e => update('leadActor2', e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Production House</Label>
-                  <Input placeholder="e.g. Dharma Productions" value={input.productionHouse} onChange={e => update('productionHouse', e.target.value)} />
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <Label>Production Team Score: {input.productionTeamScore}/10</Label>
-                <Slider min={1} max={10} value={[input.productionTeamScore ?? 6]} onValueChange={v => { const val = Array.isArray(v) ? v[0] : v; update('productionTeamScore', val) }} />
-                <p className="text-xs text-muted-foreground">
-                  {input.productionTeamScore && input.productionTeamScore >= 8 ? 'Experienced producer and line producer with reliable track record' :
-                   input.productionTeamScore && input.productionTeamScore >= 5 ? 'Adequate team with some gaps' :
-                   'Limited production experience — execution risk elevated'}
-                </p>
               </div>
             </CardContent>
           </Card>
@@ -259,7 +215,10 @@ export default function EvaluatePage() {
 
         <TabsContent value="budget" className="space-y-6">
           <Card>
-            <CardHeader><CardTitle>Budget & Cost Structure</CardTitle><CardDescription>Production budget, P&A, contingency, and financing</CardDescription></CardHeader>
+            <CardHeader>
+              <CardTitle>Budget & Rights</CardTitle>
+              <CardDescription>Financial structure — scored against historical budget band and genre performance</CardDescription>
+            </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
@@ -290,7 +249,10 @@ export default function EvaluatePage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Rights & Revenue</CardTitle><CardDescription>Pre-sold rights, brand revenue, and theatrical share assumptions</CardDescription></CardHeader>
+            <CardHeader>
+              <CardTitle>Revenue & Rights</CardTitle>
+              <CardDescription>Pre-sold rights and theatrical assumptions — the key financier mitigant</CardDescription>
+            </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
@@ -314,18 +276,13 @@ export default function EvaluatePage() {
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label>Brand Integration / Sponsorship (₹ Cr)</Label>
+                  <Label>Brand Revenue (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.brandRevenueCr} onChange={e => update('brandRevenueCr', parseFloat(e.target.value) || 0)} />
                 </div>
                 <div className="space-y-2">
                   <Label>Theatrical Share (%)</Label>
                   <Input type="number" min={10} max={70} step={1} value={input.theatricalSharePercent} onChange={e => update('theatricalSharePercent', parseFloat(e.target.value) || 50)} />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Recovery Multiple Target</Label>
-                <Input type="number" min={0.5} max={10} step={0.1} value={input.recoveryMultiple} onChange={e => update('recoveryMultiple', parseFloat(e.target.value) || 2.5)} />
-                <p className="text-xs text-muted-foreground">The gross-to-budget multiple required for full capital recovery</p>
               </div>
             </CardContent>
           </Card>
@@ -356,23 +313,14 @@ export default function EvaluatePage() {
   )
 }
 
-function LabelCheckbox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <label className="flex items-center gap-2 rounded-lg border border-input px-3 py-2 text-sm cursor-pointer hover:bg-muted/50 has-checked:border-primary has-checked:bg-primary/5">
-      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="size-4 accent-primary" />
-      {label}
-    </label>
-  )
-}
-
 function conceptClarityHint(v: number): string {
   if (v >= 8) return 'Well-defined premise with clear audience hook and market positioning'
-  if (v >= 5) return 'Adequate clarity — consider sharpening the logline and target audience fit'
+  if (v >= 5) return 'Adequate clarity — consider sharpening the logline'
   return 'Concept needs more definition to assess market viability'
 }
 
 function noveltyHint(v: number): string {
   if (v >= 7) return 'Fresh concept with distinct original elements'
-  if (v >= 4) return 'Moderately original — some familiar elements present'
-  return 'Heavily derivative — higher novelty would strengthen the investment case'
+  if (v >= 4) return 'Moderately original — some familiar elements'
+  return 'Heavily derivative — higher novelty strengthens the case'
 }

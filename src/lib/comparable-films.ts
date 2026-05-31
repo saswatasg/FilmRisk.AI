@@ -1,105 +1,23 @@
 import type { BollywoodFilm, ComparableFilm, ComparableResult, EvaluationInput } from './types'
+import type { DatasetStats } from './dataset-stats'
 
 const WEIGHTS = {
-  genre: 0.20,
-  budget: 0.18,
-  talent: 0.15,
-  year: 0.12,
-  contentProfile: 0.12,
-  sequelRemake: 0.08,
-  runtime: 0.05,
-  certificate: 0.05,
-  productionHouse: 0.05,
-}
-
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0
-  let dot = 0, normA = 0, normB = 0
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i]
-    normA += a[i] * a[i]
-    normB += b[i] * b[i]
-  }
-  if (normA === 0 || normB === 0) return 0
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB))
-}
-
-function genreSimilarity(genre1: string, genre2: string): number {
-  if (!genre1 || !genre2) return 0
-  if (genre1 === genre2) return 1
-  const g1 = genre1.toLowerCase().trim()
-  const g2 = genre2.toLowerCase().trim()
-  const related: Record<string, string[]> = {
-    'action': ['thriller', 'crime', 'historical'],
-    'comedy': ['drama', 'romance', 'family'],
-    'drama': ['social', 'biopic', 'romance', 'comedy'],
-    'romance': ['comedy', 'drama', 'musical'],
-    'thriller': ['action', 'crime', 'horror'],
-    'horror': ['thriller'],
-    'musical': ['romance', 'comedy'],
-    'biopic': ['drama', 'historical'],
-    'historical': ['action', 'drama', 'biopic', 'mythological'],
-    'crime': ['action', 'thriller', 'drama'],
-    'social': ['drama'],
-    'family': ['comedy', 'drama', 'animation'],
-  }
-  const relatedGenres = related[g1] ?? []
-  if (relatedGenres.includes(g2)) return 0.5
-  return 0.1
-}
-
-function budgetSimilarity(budgetA: number | null, budgetB: number | null): number {
-  if (budgetA === null || budgetB === null || budgetA === 0 || budgetB === 0) return 0
-  const ratio = Math.min(budgetA, budgetB) / Math.max(budgetA, budgetB)
-  return ratio
-}
-
-function yearRecency(yearA: number, yearB: number): number {
-  const diff = Math.abs(yearA - yearB)
-  if (diff <= 2) return 1
-  if (diff <= 5) return 0.8
-  if (diff <= 10) return 0.5
-  return Math.max(0, 1 - diff / 30)
-}
-
-function talentOverlap(input: EvaluationInput, film: BollywoodFilm): number {
-  let score = 0
-  if (input.director?.toLowerCase() === film.director?.toLowerCase()) score += 0.5
-  if (input.leadActor1?.toLowerCase() === film.lead_actor_1?.toLowerCase()) score += 0.3
-  if (input.leadActor2?.toLowerCase() === film.lead_actor_2?.toLowerCase()) score += 0.1
-  if (input.leadActor1?.toLowerCase() === film.lead_actor_2?.toLowerCase()) score += 0.1
-  return Math.min(1, score)
-}
-
-function contentProfileSimilarity(input: EvaluationInput, film: BollywoodFilm): number {
-  const inputProfile = [input.conceptClarity / 10, input.novelty / 10]
-  const filmProfile = [
-    film.concept_clarity_score != null ? film.concept_clarity_score / 5 : 0.5,
-    film.novelty_score != null ? film.novelty_score / 5 : 0.5,
-  ]
-  return cosineSimilarity(inputProfile, filmProfile)
-}
-
-function productionHouseMatch(input: EvaluationInput, film: BollywoodFilm): number {
-  if (!input.productionHouse) return 0
-  return input.productionHouse.toLowerCase() === film.production_house?.toLowerCase() ? 1 : 0
-}
-
-function certificateSimilarity(input: EvaluationInput, film: BollywoodFilm): number {
-  return 0.5
-}
-
-function sequelRemakeSimilarity(input: EvaluationInput, film: BollywoodFilm): number {
-  if (input.isSequel === !!film.sequel_flag && input.isRemake === !!film.remake_flag) return 1
-  if (input.isSequel === !!film.sequel_flag || input.isRemake === !!film.remake_flag) return 0.5
-  return 0
+  genre: 0.25,
+  budget: 0.22,
+  talentActor: 0.15,
+  talentDirector: 0.10,
+  year: 0.15,
+  actorScore: 0.08,
+  directorScore: 0.05,
 }
 
 export function findComparableFilms(
   input: EvaluationInput,
   films: BollywoodFilm[],
+  stats: DatasetStats,
   topN: number = 10
 ): ComparableResult {
+  const targetBand = budgetBand(input.totalBudgetCr)
   const scored: { film: BollywoodFilm; details: Record<string, number>; total: number }[] = []
 
   for (const film of films) {
@@ -107,33 +25,29 @@ export function findComparableFilms(
 
     const gs = genreSimilarity(input.primaryGenre, film.primary_genre)
     const bs = budgetSimilarity(input.totalBudgetCr, film.budget_cr)
-    const ts = talentOverlap(input, film)
-    const ys = yearRecency(new Date().getFullYear(), film.release_year)
-    const cs = contentProfileSimilarity(input, film)
-    const sr = sequelRemakeSimilarity(input, film)
-    const ph = productionHouseMatch(input, film)
+    const actorTierSim = input.actorTier === film.actor_tier_proxy ? 1 : 0.3
+    const dirTierSim = input.directorTier === film.director_tier_proxy ? 1 : 0.3
+    const ys = yearRecency(film.release_year)
+    const actorSc = actorScoreSimilarity(input, film)
+    const dirSc = dirScoreSimilarity(input, film)
 
     const total = gs * WEIGHTS.genre
       + bs * WEIGHTS.budget
-      + ts * WEIGHTS.talent
+      + actorTierSim * WEIGHTS.talentActor
+      + dirTierSim * WEIGHTS.talentDirector
       + ys * WEIGHTS.year
-      + cs * WEIGHTS.contentProfile
-      + sr * WEIGHTS.sequelRemake
-      + ph * WEIGHTS.productionHouse
-      + 0.5 * WEIGHTS.certificate
-      + 0.5 * WEIGHTS.runtime
+      + actorSc * WEIGHTS.actorScore
+      + dirSc * WEIGHTS.directorScore
 
-    if (total > 0.3) {
+    if (total > 0.2) {
       scored.push({
         film,
         details: {
           genre: Math.round(gs * 100),
           budget: Math.round(bs * 100),
-          talent: Math.round(ts * 100),
+          actorTier: Math.round(actorTierSim * 100),
+          directorTier: Math.round(dirTierSim * 100),
           recency: Math.round(ys * 100),
-          contentProfile: Math.round(cs * 100),
-          sequelRemake: Math.round(sr * 100),
-          productionHouse: Math.round(ph * 100),
         },
         total: Math.round(total * 1000) / 10,
       })
@@ -141,14 +55,65 @@ export function findComparableFilms(
   }
 
   scored.sort((a, b) => b.total - a.total)
-  const top = scored.slice(0, topN)
 
   return {
-    films: top.map(s => ({
+    films: scored.slice(0, topN).map(s => ({
       film: s.film,
       similarityScore: s.total,
       matchDetails: s.details,
     })),
-    querySummary: `${input.primaryGenre} film with ₹${input.totalBudgetCr}Cr budget directed by ${input.director}, starring ${input.leadActor1}`,
+    querySummary: `${input.primaryGenre} · ₹${input.totalBudgetCr}Cr · ${input.directorTier}-tier director · ${input.actorTier}-tier actor`,
   }
+}
+
+function genreSimilarity(g1: string, g2: string): number {
+  if (!g1 || !g2) return 0
+  if (g1 === g2) return 1
+  const a = g1.toLowerCase().trim(), b = g2.toLowerCase().trim()
+  const related: Record<string, string[]> = {
+    action: ['thriller', 'crime', 'adventure'],
+    comedy: ['drama', 'romance', 'family'],
+    drama: ['romance', 'comedy', 'biography', 'social'],
+    romance: ['comedy', 'drama', 'musical'],
+    thriller: ['action', 'crime', 'horror', 'mystery'],
+    horror: ['thriller', 'mystery'],
+    musical: ['romance', 'comedy', 'drama'],
+    biography: ['drama', 'historical'],
+    crime: ['action', 'thriller', 'drama', 'mystery'],
+    fantasy: ['action', 'adventure'],
+    history: ['drama', 'biography'],
+  }
+  return related[a]?.includes(b) ? 0.5 : 0.1
+}
+
+function budgetSimilarity(a: number, b: number): number {
+  if (a <= 0 || b <= 0) return 0
+  return Math.min(a, b) / Math.max(a, b)
+}
+
+function yearRecency(year: number): number {
+  const diff = Math.abs(2025 - year)
+  if (diff <= 2) return 1
+  if (diff <= 5) return 0.8
+  if (diff <= 10) return 0.5
+  return Math.max(0.1, 1 - diff / 30)
+}
+
+function actorScoreSimilarity(input: EvaluationInput, film: BollywoodFilm): number {
+  if (input.leadActor1.toLowerCase() === film.lead_actor_1?.toLowerCase()) return 1
+  if (input.leadActor1.toLowerCase() === film.lead_actor_2?.toLowerCase()) return 0.7
+  return 0
+}
+
+function dirScoreSimilarity(input: EvaluationInput, film: BollywoodFilm): number {
+  return input.director.toLowerCase() === film.director?.toLowerCase() ? 1 : 0
+}
+
+function budgetBand(b: number): string {
+  if (b < 10) return '<10'
+  if (b < 30) return '10-30'
+  if (b < 60) return '30-60'
+  if (b < 100) return '60-100'
+  if (b < 200) return '100-200'
+  return '>200'
 }

@@ -1,22 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
 import type { EvaluationInput, EvaluationResult } from '@/lib/types'
-import { parseCSV } from '@/lib/csv-parser'
+import { loadDataset } from '@/lib/dataset-loader'
 import { calculateGreenlightScore, calculateFinancierRisk } from '@/lib/scoring-engine'
 import { findComparableFilms } from '@/lib/comparable-films'
 import { calculateFinancialProjection } from '@/lib/financial-simulator'
 import { diagnoseRisk } from '@/lib/risk-diagnosis'
-
-let cachedFilms: ReturnType<typeof parseCSV> | null = null
-
-function loadFilms() {
-  if (cachedFilms) return cachedFilms
-  const filePath = path.join(process.cwd(), 'src', 'data', 'bollywood_master_v0.csv')
-  const text = fs.readFileSync(filePath, 'utf-8')
-  cachedFilms = parseCSV(text)
-  return cachedFilms
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,13 +17,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const films = loadFilms()
+    const { films, stats } = loadDataset()
 
-    const greenlight = calculateGreenlightScore(input)
-    const financierRisk = calculateFinancierRisk(input)
-    const comparableFilms = findComparableFilms(input, films, 8)
-    const financialProjection = calculateFinancialProjection(input)
-    const riskDiagnosis = diagnoseRisk(input)
+    const greenlight = calculateGreenlightScore(input, stats)
+    const financierRisk = calculateFinancierRisk(input, stats)
+    const comparableFilms = findComparableFilms(input, films, stats, 8)
+    const financialProjection = calculateFinancialProjection(input, stats)
+    const riskDiagnosis = diagnoseRisk(input, stats)
 
     const result: EvaluationResult = {
       projectSummary: {

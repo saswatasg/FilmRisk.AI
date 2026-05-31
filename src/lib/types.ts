@@ -3,74 +3,40 @@ export interface BollywoodFilm {
   canonical_title: string
   display_title: string
   release_year: number
-  release_month: string
-  release_month_num: number
-  release_date: string
   primary_genre: string
-  secondary_genre: string
-  all_genres: string
-  sequel_flag: number
-  remake_flag: number
   director: string
   lead_actor_1: string
   lead_actor_2: string
-  cast_list: string
-  writer_list: string
   production_house: string
-  actor_rank_score: number
+  actor_rank_score: number | null
   actor_tier_proxy: string
-  director_rank_score: number
+  director_rank_score: number | null
   director_tier_proxy: string
   budget_cr: number | null
   worldwide_gross_cr: number | null
   gross_multiple: number | null
-  gross_multiple_bucket: string
-  budget_band: string
-  box_office_source_type: string
   verdict_raw: string
   hitflop_numeric: number | null
   imdb_rating: number | null
   imdb_votes: number | null
-  imdb_weighted_rating: number | null
-  imdb_id: string
   runtime_min: number | null
-  certificate: string
-  overview: string
   model_usage: string
   financial_data_confidence: string
-  metadata_confidence: string
-  row_quality_score: string
-  stage_allowed_greenlight: string
-  source_count: number
-  source_files: string
-  primary_source: string
-  dedupe_key: string
-  notes: string
-  concept_clarity_score: number | null
-  novelty_score: number | null
-  theatricality_score: number | null
-  mass_appeal_score: number | null
-  urban_appeal_score: number | null
-  youth_appeal_score: number | null
-  family_appeal_score: number | null
-  music_dependency_score: number | null
 }
 
 export interface EvaluationInput {
-  filmTitle?: string
+  filmTitle: string
   primaryGenre: string
-  secondaryGenre?: string
   logline: string
   conceptClarity: number
   novelty: number
   director: string
   leadActor1: string
-  leadActor2?: string
-  directorTier?: string
-  actorTier?: string
+  directorTier: string
+  actorTier: string
   totalBudgetCr: number
-  pAndABudgetCr: number
   productionBudgetCr: number
+  pAndABudgetCr: number
   contingencyPercent: number
   ottRightsCr: number
   satelliteRightsCr: number
@@ -79,17 +45,8 @@ export interface EvaluationInput {
   brandRevenueCr: number
   financingCostCr: number
   theatricalSharePercent: number
-  recoveryMultiple: number
-  isSequel: boolean
-  isRemake: boolean
-  hasFranchisePotential: boolean
-  targetAudience: string
   marketTiming: 'strong' | 'neutral' | 'weak'
-  productionHouse?: string
-  productionTeamScore?: number
 }
-
-export type Verdict = 'greenlight' | 'conditional' | 'dont_invest'
 
 export interface ScoreComponent {
   label: string
@@ -102,7 +59,7 @@ export interface ScoreComponent {
 
 export interface GreenlightScoreResult {
   totalScore: number
-  verdict: Verdict
+  verdict: 'greenlight' | 'conditional' | 'dont_invest'
   components: ScoreComponent[]
   confidence: 'high' | 'medium' | 'low'
 }
@@ -168,8 +125,6 @@ export interface EvaluationResult {
   riskDiagnosis: RiskDiagnosis
   timestamp: string
 }
-
-export type DataConfidence = 'high' | 'medium' | 'low'
 
 export interface DatasetSummary {
   totalFilms: number
