@@ -43,7 +43,7 @@ function defaultInput(): EvaluationInput {
     overseasRightsCr: 0,
     brandRevenueCr: 0,
     financingCostCr: 0,
-    theatricalSharePercent: 50,
+    theatricalSharePercent: 40,
     marketTiming: 'neutral',
   }
 }
@@ -258,30 +258,36 @@ export default function EvaluatePage() {
                 <div className="space-y-2">
                   <Label>OTT / Digital Rights (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.ottRightsCr} onChange={e => update('ottRightsCr', parseFloat(e.target.value) || 0)} />
+                  <p className="text-xs text-muted-foreground">Market: 40–60% of budget for strong projects; performance-linked pricing is standard</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Satellite Rights (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.satelliteRightsCr} onChange={e => update('satelliteRightsCr', parseFloat(e.target.value) || 0)} />
+                  <p className="text-xs text-muted-foreground">Market: 5–15% of budget (down 50%+ from pre-pandemic levels, ~10% of budget typical)</p>
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Music Rights (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.musicRightsCr} onChange={e => update('musicRightsCr', parseFloat(e.target.value) || 0)} />
+                  <p className="text-xs text-muted-foreground">Market: 10–20% of budget for big films; varies by music label and star power</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Overseas Rights (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.overseasRightsCr} onChange={e => update('overseasRightsCr', parseFloat(e.target.value) || 0)} />
+                  <p className="text-xs text-muted-foreground">Market: 10–25% of budget; heavily dependent on NRI diaspora markets</p>
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Brand Revenue (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.brandRevenueCr} onChange={e => update('brandRevenueCr', parseFloat(e.target.value) || 0)} />
+                  <p className="text-xs text-muted-foreground">Market: 5–15% of budget; brand integrations are a growing revenue stream</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Theatrical Share (%)</Label>
-                  <Input type="number" min={10} max={70} step={1} value={input.theatricalSharePercent} onChange={e => update('theatricalSharePercent', parseFloat(e.target.value) || 50)} />
+                  <Input type="number" min={10} max={70} step={1} value={input.theatricalSharePercent} onChange={e => update('theatricalSharePercent', parseFloat(e.target.value) || 40)} />
+                  <p className="text-xs text-muted-foreground">Real-world: ~35–40% after distributor/exhibitor cuts (Week 1 multiplex: ~41% to distributor)</p>
                 </div>
               </div>
             </CardContent>

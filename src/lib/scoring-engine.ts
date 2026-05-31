@@ -2,14 +2,14 @@ import type { EvaluationInput, GreenlightScoreResult, FinancierRiskResult, Score
 import type { DatasetStats } from './dataset-stats'
 
 const W = {
-  genreViability: 0.13,
+  genreViability: 0.12,
   genreBudgetFit: 0.07,
-  budgetFeasibility: 0.18,
-  talentStrength: 0.16,
+  budgetFeasibility: 0.17,
+  talentStrength: 0.18,
   preSaleCoverage: 0.22,
   conceptQuality: 0.10,
-  marketTiming: 0.07,
-  productionViability: 0.07,
+  marketTiming: 0.08,
+  productionViability: 0.06,
 }
 
 const FW = {
@@ -19,8 +19,8 @@ const FW = {
   genreBudgetRisk: 0.08,
   talentLiquidity: 0.15,
   conceptRisk: 0.10,
-  marketTiming: 0.08,
-  productionRisk: 0.07,
+  marketTiming: 0.09,
+  productionRisk: 0.06,
 }
 
 function budgetBand(b: number): string {
@@ -38,7 +38,7 @@ function scoreGenreViability(input: EvaluationInput, stats: DatasetStats): Score
     return { label: 'Genre Viability', score: 5, maxScore: 10, weight: W.genreViability, contribution: 5 * W.genreViability, explanation: `${input.primaryGenre}: insufficient data` }
   }
   const wr = gs.adjustedWinRatePct
-  const score = Math.round(Math.min(wr, 80) / 80 * 10 * 10) / 10
+  const score = Math.round(Math.min(wr, 85) / 85 * 10 * 10) / 10
   return {
     label: 'Genre Viability', score, maxScore: 10, weight: W.genreViability,
     contribution: score * W.genreViability,
@@ -92,7 +92,7 @@ function scoreTalentStrength(input: EvaluationInput, stats: DatasetStats): Score
   const d = stats.directorTierStats[input.directorTier]
   const aWR = a ? a.adjustedWinRatePct : 25
   const dWR = d ? d.adjustedWinRatePct : 25
-  const composite = Math.round(aWR * 0.55 + dWR * 0.45)
+  const composite = Math.round(aWR * 0.45 + dWR * 0.55)
   const score = Math.round(Math.min(composite, 80) / 80 * 10 * 10) / 10
   return {
     label: 'Talent Strength', score, maxScore: 10, weight: W.talentStrength,
@@ -177,7 +177,7 @@ export function calculateGreenlightScore(input: EvaluationInput, stats: DatasetS
 function finGenreRisk(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
   const gs = stats.genreStats[input.primaryGenre]
   const wr = gs ? gs.adjustedWinRatePct : 30
-  const score = Math.round(Math.min(wr, 75) / 75 * 10 * 10) / 10
+  const score = Math.round(Math.min(wr, 80) / 80 * 10 * 10) / 10
   return {
     label: 'Genre Risk', score, maxScore: 10, weight: FW.genreRisk,
     contribution: score * FW.genreRisk,
@@ -201,7 +201,7 @@ function finGenreBudgetRisk(input: EvaluationInput, stats: DatasetStats): ScoreC
   const key = `${input.primaryGenre}|${budgetBand(input.totalBudgetCr)}`
   const gb = stats.genreBudgetStats[key]
   const wr = gb ? gb.adjustedWinRatePct : 30
-  const score = Math.round(Math.min(wr, 75) / 75 * 10 * 10) / 10
+  const score = Math.round(Math.min(wr, 80) / 80 * 10 * 10) / 10
   return {
     label: 'Genre-Budget Risk', score, maxScore: 10, weight: FW.genreBudgetRisk,
     contribution: score * FW.genreBudgetRisk,

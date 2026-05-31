@@ -92,7 +92,7 @@ function talentMultipleBoost(input: EvaluationInput, stats: DatasetStats): numbe
   const dirData = stats.directorTierStats[dt]
   const actorRatio = actorData && globalAvg > 0 ? actorData.avgMultiple / globalAvg : 1
   const dirRatio = dirData && globalAvg > 0 ? dirData.avgMultiple / globalAvg : 1
-  return parseFloat((actorRatio * 0.55 + dirRatio * 0.45).toFixed(2))
+  return parseFloat((actorRatio * 0.45 + dirRatio * 0.55).toFixed(2))
 }
 
 function budgetBand(b: number): string {

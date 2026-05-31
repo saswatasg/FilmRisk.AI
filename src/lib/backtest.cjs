@@ -135,7 +135,7 @@ const gbStats = stats('genreBudget', gbRaw);
 const comboS = stats('combo', comboRaw);
 
 // --- Scoring functions (matching TS) ---
-const W = { genre: 0.13, gbFit: 0.07, budget: 0.18, talent: 0.16, preSale: 0.22, concept: 0.10, timing: 0.07, production: 0.07 };
+const W = { genre: 0.12, gbFit: 0.07, budget: 0.17, talent: 0.18, preSale: 0.22, concept: 0.10, timing: 0.08, production: 0.06 };
 
 function estimatePreSale(budget) {
   if (budget > 150) return { score: 7, ratio: 0.55 };
@@ -151,7 +151,7 @@ function predict(film) {
   const ck = film.directorTier + '+' + film.actorTier;
   const cs = comboS[ck];
 
-  const gScore = gs ? Math.round(Math.min(gs.adjWR, 80) / 80 * 10 * 10) / 10 : 5;
+  const gScore = gs ? Math.round(Math.min(gs.adjWR, 85) / 85 * 10 * 10) / 10 : 5;
   const gbScore = gb ? Math.round(Math.min(gb.adjWR, 85) / 85 * 10 * 10) / 10 : 5;
   const bScore = bs ? Math.round(Math.min(bs.adjWR, 75) / 75 * 10 * 10) / 10 : 5;
   let tScore;
@@ -160,7 +160,7 @@ function predict(film) {
   } else {
     const a = actorStats[film.actorTier]; const d = dirStats[film.directorTier];
     const aWR = a ? a.adjWR : 25; const dWR = d ? d.adjWR : 25;
-    tScore = Math.round(Math.min(aWR * 0.55 + dWR * 0.45, 80) / 80 * 10 * 10) / 10;
+    tScore = Math.round(Math.min(aWR * 0.45 + dWR * 0.55, 80) / 80 * 10 * 10) / 10;
   }
   const p = estimatePreSale(film.budget);
   const conceptScore = 5.5;
