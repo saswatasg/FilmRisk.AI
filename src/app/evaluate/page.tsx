@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Slider } from '@/components/ui/slider'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Separator } from '@/components/ui/separator'
-import { Loader2, ChevronRight, Users, Banknote, FileText } from 'lucide-react'
+import { Loader2, ChevronRight, Users, Banknote, FileText, AlertCircle } from 'lucide-react'
 import type { EvaluationInput, EvaluationResult } from '@/lib/types'
 import { EvaluationResults } from './results'
 
@@ -31,6 +31,15 @@ const GENRES = [
 
 const TIERS = ['A', 'B', 'C', 'D']
 
+const PRODUCTION_HOUSES = [
+  '', 'Yash Raj Films', 'Dharma Productions', 'T-Series', 'Red Chillies Entertainment',
+  'Maddock Films', 'Excel Entertainment', 'RSVP Movies', 'Viacom18 Studios',
+  'PVR Pictures', 'Zee Studios', 'Pen Movies', 'Eros International',
+  'Sony Pictures Networks', 'Fox Star Studios', 'Disney India',
+  'UTV Motion Pictures', 'Balaji Motion Pictures', 'Tips Industries',
+  'Lavender Films', 'Cine1 Studios', 'Nadiadwala Grandson',
+]
+
 function defaultInput(): EvaluationInput {
   return {
     filmTitle: '',
@@ -42,6 +51,7 @@ function defaultInput(): EvaluationInput {
     leadActor1: '',
     directorTier: 'C',
     actorTier: 'C',
+    productionHouse: '',
     totalBudgetCr: 30,
     productionBudgetCr: 22,
     pAndABudgetCr: 6,
@@ -76,19 +86,16 @@ export default function EvaluatePage() {
     setLoading(true)
     setError(null)
     setResult(null)
-
     try {
       const res = await fetch('/api/evaluate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(input),
       })
-
       if (!res.ok) {
         const err = await res.json()
         throw new Error(err.error ?? 'Evaluation failed')
       }
-
       const data: EvaluationResult = await res.json()
       setResult(data)
     } catch (err) {
@@ -108,17 +115,17 @@ export default function EvaluatePage() {
       </div>
 
       <Tabs defaultValue="info" className="mb-8">
-        <TabsList className="mb-6">
-          <TabsTrigger value="info" className="gap-2"><FileText className="size-4" /> Film Info</TabsTrigger>
-          <TabsTrigger value="talent" className="gap-2"><Users className="size-4" /> Talent</TabsTrigger>
-          <TabsTrigger value="budget" className="gap-2"><Banknote className="size-4" /> Budget & Rights</TabsTrigger>
+        <TabsList className="mb-6 w-full overflow-x-auto sm:w-auto">
+          <TabsTrigger value="info" className="gap-2 whitespace-nowrap"><FileText className="size-4" /> Film Info</TabsTrigger>
+          <TabsTrigger value="talent" className="gap-2 whitespace-nowrap"><Users className="size-4" /> Talent</TabsTrigger>
+          <TabsTrigger value="budget" className="gap-2 whitespace-nowrap"><Banknote className="size-4" /> Budget & Rights</TabsTrigger>
         </TabsList>
 
         <TabsContent value="info" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Film Information</CardTitle>
-              <CardDescription>Genre, concept, and market timing — data-backed genre viability scoring</CardDescription>
+              <CardDescription>Genre, concept, and market timing</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -151,12 +158,10 @@ export default function EvaluatePage() {
                 <div className="space-y-3">
                   <Label>Concept Clarity: {input.conceptClarity}/10</Label>
                   <Slider min={1} max={10} value={[input.conceptClarity]} onValueChange={v => { const val = Array.isArray(v) ? v[0] : v; update('conceptClarity', val) }} />
-                  <p className="text-xs text-muted-foreground">{conceptClarityHint(input.conceptClarity)}</p>
                 </div>
                 <div className="space-y-3">
                   <Label>Novelty / Originality: {input.novelty}/10</Label>
                   <Slider min={1} max={10} value={[input.novelty]} onValueChange={v => { const val = Array.isArray(v) ? v[0] : v; update('novelty', val) }} />
-                  <p className="text-xs text-muted-foreground">{noveltyHint(input.novelty)}</p>
                 </div>
               </div>
 
@@ -192,7 +197,7 @@ export default function EvaluatePage() {
           <Card>
             <CardHeader>
               <CardTitle>Talent Configuration</CardTitle>
-              <CardDescription>Director and lead actor tiers — scored against historical combo win rates from the dataset</CardDescription>
+              <CardDescription>Director, lead actor, and production house</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -228,6 +233,18 @@ export default function EvaluatePage() {
                   </Select>
                 </div>
               </div>
+
+              <div className="space-y-2">
+                <Label>Production House</Label>
+                <Select value={input.productionHouse} onValueChange={v => selectUpdate('productionHouse', v)}>
+                  <SelectTrigger><SelectValue placeholder="Select production house" /></SelectTrigger>
+                  <SelectContent>
+                    {PRODUCTION_HOUSES.map(h => (
+                      <SelectItem key={h} value={h}>{h || 'None / Unknown'}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
@@ -236,7 +253,7 @@ export default function EvaluatePage() {
           <Card>
             <CardHeader>
               <CardTitle>Budget & Rights</CardTitle>
-              <CardDescription>Financial structure — scored against historical budget band and genre performance</CardDescription>
+              <CardDescription>Financial structure</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-3">
@@ -270,43 +287,43 @@ export default function EvaluatePage() {
           <Card>
             <CardHeader>
               <CardTitle>Revenue & Rights</CardTitle>
-              <CardDescription>Pre-sold rights and theatrical assumptions — the key financier mitigant</CardDescription>
+              <CardDescription>Pre-sold rights and theatrical assumptions</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>OTT / Digital Rights (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.ottRightsCr} onChange={e => update('ottRightsCr', parseFloat(e.target.value) || 0)} />
-                  <p className="text-xs text-muted-foreground">Market: 40–60% of budget for strong projects; performance-linked pricing is standard</p>
+                  <p className="text-xs text-muted-foreground">Market: 40–60% of budget for strong projects</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Satellite Rights (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.satelliteRightsCr} onChange={e => update('satelliteRightsCr', parseFloat(e.target.value) || 0)} />
-                  <p className="text-xs text-muted-foreground">Market: 5–15% of budget (down 50%+ from pre-pandemic levels, ~10% of budget typical)</p>
+                  <p className="text-xs text-muted-foreground">Market: 5–15% of budget; ~10% typical post-pandemic</p>
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Music Rights (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.musicRightsCr} onChange={e => update('musicRightsCr', parseFloat(e.target.value) || 0)} />
-                  <p className="text-xs text-muted-foreground">Market: 10–20% of budget for big films; varies by music label and star power</p>
+                  <p className="text-xs text-muted-foreground">Market: 10–20% of budget</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Overseas Rights (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.overseasRightsCr} onChange={e => update('overseasRightsCr', parseFloat(e.target.value) || 0)} />
-                  <p className="text-xs text-muted-foreground">Market: 10–25% of budget; heavily dependent on NRI diaspora markets</p>
+                  <p className="text-xs text-muted-foreground">Market: 10–25% of budget</p>
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label>Brand Revenue (₹ Cr)</Label>
                   <Input type="number" min={0} step={0.5} value={input.brandRevenueCr} onChange={e => update('brandRevenueCr', parseFloat(e.target.value) || 0)} />
-                  <p className="text-xs text-muted-foreground">Market: 5–15% of budget; brand integrations are a growing revenue stream</p>
+                  <p className="text-xs text-muted-foreground">Market: 5–15% of budget</p>
                 </div>
                 <div className="space-y-2">
                   <Label>Theatrical Share (%)</Label>
                   <Input type="number" min={10} max={70} step={1} value={input.theatricalSharePercent} onChange={e => update('theatricalSharePercent', parseFloat(e.target.value) || 40)} />
-                  <p className="text-xs text-muted-foreground">Real-world: ~35–40% after distributor/exhibitor cuts (Week 1 multiplex: ~41% to distributor)</p>
+                  <p className="text-xs text-muted-foreground">Real-world: ~35–40% to producer</p>
                 </div>
               </div>
             </CardContent>
@@ -333,19 +350,76 @@ export default function EvaluatePage() {
         </Card>
       )}
 
-      {result && <EvaluationResults result={result} className="mt-8" />}
+      {result ? (
+        <EvaluationResults result={result} className="mt-8" />
+      ) : !loading && (
+        <Card className="mt-8 border-dashed">
+          <CardHeader>
+            <CardTitle className="text-base text-muted-foreground">Quick Start</CardTitle>
+            <CardDescription>Click an example to pre-fill the form and run your first evaluation</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 sm:grid-cols-3">
+              {EXAMPLES.map((ex, i) => (
+                <button key={i} type="button" onClick={() => { setInput(ex.input); setResult(null); setError(null) }}
+                  className="rounded-lg border p-4 text-left transition-colors hover:border-primary/50 hover:bg-muted/50">
+                  <p className="font-medium text-sm">{ex.title}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{ex.genre} &middot; ₹{ex.budget}Cr</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{ex.description}</p>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }
 
-function conceptClarityHint(v: number): string {
-  if (v >= 8) return 'Well-defined premise with clear audience hook and market positioning'
-  if (v >= 5) return 'Adequate clarity — consider sharpening the logline'
-  return 'Concept needs more definition to assess market viability'
-}
-
-function noveltyHint(v: number): string {
-  if (v >= 7) return 'Fresh concept with distinct original elements'
-  if (v >= 4) return 'Moderately original — some familiar elements'
-  return 'Heavily derivative — higher novelty strengthens the case'
-}
+const EXAMPLES = [
+  {
+    title: 'Mass Action Film',
+    genre: 'Action',
+    budget: 120,
+    description: 'A-tier talent, big set pieces, strong OTT pre-sale',
+    input: {
+      filmTitle: 'Mass Action Film', primaryGenre: 'Action', logline: 'A high-octane action thriller set in the underbelly of Mumbai with a star-driven ensemble cast.',
+      conceptClarity: 8, novelty: 5,
+      director: 'Kabir Khan', leadActor1: 'Tiger Shroff', directorTier: 'B', actorTier: 'B',
+      productionHouse: 'Yash Raj Films',
+      totalBudgetCr: 120, productionBudgetCr: 80, pAndABudgetCr: 30, contingencyPercent: 10,
+      ottRightsCr: 55, satelliteRightsCr: 15, musicRightsCr: 12, overseasRightsCr: 20, brandRevenueCr: 8,
+      financingCostCr: 5, theatricalSharePercent: 40, marketTiming: 'strong' as const, releaseMonth: 11,
+    },
+  },
+  {
+    title: 'Indie Drama Debut',
+    genre: 'Drama',
+    budget: 15,
+    description: 'Small budget, festival play, limited pre-sale',
+    input: {
+      filmTitle: 'Indie Drama Debut', primaryGenre: 'Drama', logline: 'A deeply personal story of a small-town musician finding her voice against all odds.',
+      conceptClarity: 7, novelty: 8,
+      director: 'New Director', leadActor1: 'Rising Star', directorTier: 'D', actorTier: 'C',
+      productionHouse: '',
+      totalBudgetCr: 15, productionBudgetCr: 11, pAndABudgetCr: 3, contingencyPercent: 7,
+      ottRightsCr: 4, satelliteRightsCr: 2, musicRightsCr: 3, overseasRightsCr: 2, brandRevenueCr: 0,
+      financingCostCr: 1, theatricalSharePercent: 42, marketTiming: 'neutral' as const, releaseMonth: 5,
+    },
+  },
+  {
+    title: 'Holiday Comedy',
+    genre: 'Comedy',
+    budget: 60,
+    description: 'B-tier talent, Diwali release, strong satellite',
+    input: {
+      filmTitle: 'Holiday Comedy', primaryGenre: 'Comedy', logline: 'A laugh-out-loud family comedy set during Diwali, blending tradition with modern humor.',
+      conceptClarity: 7, novelty: 6,
+      director: 'Anees Bazmee', leadActor1: 'Kartik Aaryan', directorTier: 'C', actorTier: 'B',
+      productionHouse: 'Dharma Productions',
+      totalBudgetCr: 60, productionBudgetCr: 40, pAndABudgetCr: 14, contingencyPercent: 10,
+      ottRightsCr: 22, satelliteRightsCr: 8, musicRightsCr: 6, overseasRightsCr: 8, brandRevenueCr: 5,
+      financingCostCr: 2, theatricalSharePercent: 40, marketTiming: 'strong' as const, releaseMonth: 10,
+    },
+  },
+]

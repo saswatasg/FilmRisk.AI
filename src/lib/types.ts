@@ -35,6 +35,7 @@ export interface EvaluationInput {
   leadActor1: string
   directorTier: string
   actorTier: string
+  productionHouse: string
   totalBudgetCr: number
   productionBudgetCr: number
   pAndABudgetCr: number
@@ -57,6 +58,8 @@ export interface ScoreComponent {
   weight: number
   contribution: number
   explanation: string
+  sampleSize?: number
+  trajectory?: 'up' | 'down' | 'stable' | null
 }
 
 export interface GreenlightScoreResult {
@@ -64,6 +67,7 @@ export interface GreenlightScoreResult {
   verdict: 'greenlight' | 'conditional' | 'dont_invest'
   components: ScoreComponent[]
   confidence: 'high' | 'medium' | 'low'
+  confidenceInterval: { lower: number; upper: number }
 }
 
 export interface FinancierRiskResult {
@@ -71,6 +75,7 @@ export interface FinancierRiskResult {
   riskLevel: 'low' | 'moderate' | 'high' | 'very_high'
   components: ScoreComponent[]
   capitalRecoveryProb: number
+  confidenceInterval: { lower: number; upper: number }
 }
 
 export interface ComparableFilm {
@@ -112,6 +117,24 @@ export interface RiskDiagnosis {
   topRecommendations: string[]
 }
 
+export interface SensitivityItem {
+  label: string
+  field: string
+  currentValue: string
+  suggestedValue: string
+  potentialGain: number
+  description: string
+}
+
+export interface PreSaleBenchmark {
+  category: string
+  userValue: number
+  marketMin: number
+  marketMax: number
+  status: 'below' | 'within' | 'above'
+  tip?: string
+}
+
 export interface EvaluationResult {
   projectSummary: {
     title: string
@@ -125,6 +148,10 @@ export interface EvaluationResult {
   comparableFilms: ComparableResult
   financialProjection: FinancialProjection
   riskDiagnosis: RiskDiagnosis
+  sensitivities: SensitivityItem[]
+  preSaleBenchmarks: PreSaleBenchmark[]
+  validationErrors: string[]
+  dataQualityWarnings: string[]
   timestamp: string
 }
 

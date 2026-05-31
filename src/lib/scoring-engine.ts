@@ -3,26 +3,28 @@ import type { DatasetStats } from './dataset-stats'
 
 const W = {
   genreViability: 0.12,
-  genreBudgetFit: 0.07,
-  budgetFeasibility: 0.15,
-  talentStrength: 0.18,
+  genreBudgetFit: 0.06,
+  budgetFeasibility: 0.14,
+  talentStrength: 0.17,
   preSaleCoverage: 0.22,
   conceptQuality: 0.10,
   marketTiming: 0.08,
   seasonality: 0.03,
-  productionViability: 0.05,
+  productionViability: 0.04,
+  productionHouse: 0.04,
 }
 
 const FW = {
-  capitalRecovery: 0.25,
-  genreRisk: 0.12,
-  budgetRisk: 0.15,
-  genreBudgetRisk: 0.08,
-  talentLiquidity: 0.14,
+  capitalRecovery: 0.24,
+  genreRisk: 0.11,
+  budgetRisk: 0.14,
+  genreBudgetRisk: 0.07,
+  talentLiquidity: 0.13,
   conceptRisk: 0.10,
   marketTiming: 0.07,
   seasonalityRisk: 0.04,
-  productionRisk: 0.05,
+  productionHouseRisk: 0.04,
+  productionRisk: 0.06,
 }
 
 function budgetBand(b: number): string {
@@ -34,17 +36,32 @@ function budgetBand(b: number): string {
   return '>200'
 }
 
+function multScore(mult: number, cap: number = 4.0): number {
+  return Math.round(Math.min(mult / cap, 1) * 10 * 10) / 10
+}
+
 function scoreGenreViability(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
   const gs = stats.genreStats[input.primaryGenre]
   if (!gs || gs.count < 3) {
     return { label: 'Genre Viability', score: 5, maxScore: 10, weight: W.genreViability, contribution: 5 * W.genreViability, explanation: `${input.primaryGenre}: insufficient data` }
   }
-  const wr = gs.adjustedWinRatePct
-  const score = Math.round(Math.min(wr, 85) / 85 * 10 * 10) / 10
+  const score = multScore(gs.avgMultiple, 4.0)
+  const trajPart = gs.trajectory ? ` (trending ${gs.trajectory})` : ''
   return {
     label: 'Genre Viability', score, maxScore: 10, weight: W.genreViability,
-    contribution: score * W.genreViability,
-    explanation: `${input.primaryGenre}: ${gs.winRatePct}% raw → ${wr}% adjusted (${gs.count} films, avg ${gs.avgMultiple}x)`,
+    contribution: score * W.genreViability, sampleSize: gs.count, trajectory: gs.trajectory,
+    explanation: `${input.primaryGenre}: avg ${gs.avgMultiple}x (${gs.count} films${trajPart})`,
+  }
+}
+
+function finGenreRisk(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
+  const gs = stats.genreStats[input.primaryGenre]
+  const mult = gs ? gs.avgMultiple : 1.0
+  const score = multScore(mult, 4.0)
+  return {
+    label: 'Genre Risk', score, maxScore: 10, weight: FW.genreRisk,
+    contribution: score * FW.genreRisk, sampleSize: gs?.count ?? 0, trajectory: gs?.trajectory ?? null,
+    explanation: `${input.primaryGenre}: avg ${mult.toFixed(2)}x${gs?.trajectory ? ` (trending ${gs.trajectory})` : ''}`,
   }
 }
 
@@ -54,12 +71,11 @@ function scoreGenreBudgetFit(input: EvaluationInput, stats: DatasetStats): Score
   if (!gb || gb.count < 2) {
     return { label: 'Genre-Budget Fit', score: 5, maxScore: 10, weight: W.genreBudgetFit, contribution: 5 * W.genreBudgetFit, explanation: 'No historical genre-budget combos' }
   }
-  const wr = gb.adjustedWinRatePct
-  const score = Math.round(Math.min(wr, 85) / 85 * 10 * 10) / 10
+  const score = multScore(gb.avgMultiple, 4.0)
   return {
     label: 'Genre-Budget Fit', score, maxScore: 10, weight: W.genreBudgetFit,
-    contribution: score * W.genreBudgetFit,
-    explanation: `${input.primaryGenre} + ${budgetBand(input.totalBudgetCr)}: ${gb.adjustedWinRatePct}% adjusted WR (${gb.count} films)`,
+    contribution: score * W.genreBudgetFit, sampleSize: gb.count,
+    explanation: `${input.primaryGenre} + ${budgetBand(input.totalBudgetCr)}: avg ${gb.avgMultiple}x (${gb.count} films)`,
   }
 }
 
@@ -69,12 +85,11 @@ function scoreBudgetFeasibility(input: EvaluationInput, stats: DatasetStats): Sc
   if (!bd) {
     return { label: 'Budget Feasibility', score: 5, maxScore: 10, weight: W.budgetFeasibility, contribution: 5 * W.budgetFeasibility, explanation: `${band}: no data` }
   }
-  const wr = bd.adjustedWinRatePct
-  const score = Math.round(Math.min(wr, 75) / 75 * 10 * 10) / 10
+  const score = multScore(bd.avgMultiple, 3.5)
   return {
     label: 'Budget Feasibility', score, maxScore: 10, weight: W.budgetFeasibility,
-    contribution: score * W.budgetFeasibility,
-    explanation: `₹${input.totalBudgetCr}Cr (${band}): ${bd.winRatePct}% raw → ${wr}% adjusted (${bd.count} films)`,
+    contribution: score * W.budgetFeasibility, sampleSize: bd.count,
+    explanation: `₹${input.totalBudgetCr}Cr (${band}): avg ${bd.avgMultiple}x (${bd.count} films)`,
   }
 }
 
@@ -82,24 +97,24 @@ function scoreTalentStrength(input: EvaluationInput, stats: DatasetStats): Score
   const comboKey = `${input.directorTier}+${input.actorTier}`
   const combo = stats.comboStats[comboKey]
   if (combo && combo.count >= 2) {
-    const wr = combo.adjustedWinRatePct
-    const score = Math.round(Math.min(wr, 85) / 85 * 10 * 10) / 10
+    const score = multScore(combo.avgMultiple, 4.0)
     return {
       label: 'Talent Strength', score, maxScore: 10, weight: W.talentStrength,
-      contribution: score * W.talentStrength,
-      explanation: `${input.directorTier}+${input.actorTier}: ${combo.winRatePct}% → ${wr}% adjusted (${combo.count} films)`,
+      contribution: score * W.talentStrength, sampleSize: combo.count,
+      explanation: `${input.directorTier}+${input.actorTier}: avg ${combo.avgMultiple}x (${combo.count} films)`,
     }
   }
   const a = stats.actorTierStats[input.actorTier]
   const d = stats.directorTierStats[input.directorTier]
-  const aWR = a ? a.adjustedWinRatePct : 25
-  const dWR = d ? d.adjustedWinRatePct : 25
-  const composite = Math.round(aWR * 0.45 + dWR * 0.55)
-  const score = Math.round(Math.min(composite, 85) / 85 * 10 * 10) / 10
+  const aM = a ? a.avgMultiple : 1.0
+  const dM = d ? d.avgMultiple : 1.0
+  const composite = aM * 0.45 + dM * 0.55
+  const score = multScore(composite, 4.0)
   return {
     label: 'Talent Strength', score, maxScore: 10, weight: W.talentStrength,
     contribution: score * W.talentStrength,
-    explanation: `Dir${input.directorTier}(~${dWR}%) + Act${input.actorTier}(~${aWR}%)`,
+    sampleSize: Math.max(a?.count ?? 0, d?.count ?? 0),
+    explanation: `Dir${input.directorTier}(~${dM.toFixed(2)}x) + Act${input.actorTier}(~${aM.toFixed(2)}x)`,
   }
 }
 
@@ -134,12 +149,11 @@ function scoreSeasonality(input: EvaluationInput, stats: DatasetStats): ScoreCom
   if (!ms || ms.count < 3) {
     return { label: 'Seasonality', score: 6, maxScore: 10, weight: W.seasonality, contribution: 6 * W.seasonality, explanation: `${monthName(input.releaseMonth)}: insufficient data` }
   }
-  const wr = ms.adjustedWinRatePct
-  const score = Math.round(Math.min(wr, 80) / 80 * 10 * 10) / 10
+  const score = multScore(ms.avgMultiple, 3.5)
   return {
     label: 'Seasonality', score, maxScore: 10, weight: W.seasonality,
-    contribution: score * W.seasonality,
-    explanation: `${monthName(input.releaseMonth)}: ${ms.winRatePct}% raw → ${wr}% adjusted (${ms.count} films, avg ${ms.avgMultiple}x)`,
+    contribution: score * W.seasonality, sampleSize: ms.count,
+    explanation: `${monthName(input.releaseMonth)}: avg ${ms.avgMultiple}x (${ms.count} films)`,
   }
 }
 
@@ -172,6 +186,28 @@ function scoreProductionViability(input: EvaluationInput): ScoreComponent {
   }
 }
 
+function scoreProductionHouse(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
+  if (!input.productionHouse) return { label: 'Production House', score: 5, maxScore: 10, weight: W.productionHouse, contribution: 5 * W.productionHouse, explanation: 'No production house selected' }
+  const ph = stats.productionHouseStats[input.productionHouse]
+  if (!ph || ph.count < 3) {
+    return { label: 'Production House', score: 5, maxScore: 10, weight: W.productionHouse, contribution: 5 * W.productionHouse, explanation: `${input.productionHouse}: insufficient data (${ph ? ph.count : 0} films)` }
+  }
+  const score = multScore(ph.avgMultiple, 4.0)
+  return {
+    label: 'Production House', score, maxScore: 10, weight: W.productionHouse,
+    contribution: score * W.productionHouse, sampleSize: ph.count,
+    explanation: `${input.productionHouse}: avg ${ph.avgMultiple}x (${ph.count} films)`,
+  }
+}
+
+function computeConfidenceInterval(components: ScoreComponent[]): { lower: number; upper: number } {
+  const sampleSizes = components.map(c => c.sampleSize ?? 0).filter(n => n > 0)
+  if (sampleSizes.length < 3) return { lower: -5, upper: 5 }
+  const avgN = sampleSizes.reduce((s, n) => s + n, 0) / sampleSizes.length
+  const se = 10 / Math.sqrt(avgN)
+  return { lower: Math.round(-1.96 * se * 10) / 10, upper: Math.round(1.96 * se * 10) / 10 }
+}
+
 export function calculateGreenlightScore(input: EvaluationInput, stats: DatasetStats): GreenlightScoreResult {
   const components = [
     scoreGenreViability(input, stats),
@@ -183,6 +219,7 @@ export function calculateGreenlightScore(input: EvaluationInput, stats: DatasetS
     scoreSeasonality(input, stats),
     scoreMarketTiming(input),
     scoreProductionViability(input),
+    scoreProductionHouse(input, stats),
   ]
 
   const raw = components.reduce((s, c) => s + c.contribution, 0)
@@ -192,53 +229,43 @@ export function calculateGreenlightScore(input: EvaluationInput, stats: DatasetS
   const filled = [input.primaryGenre, input.logline, input.director, input.leadActor1].filter(Boolean).length
   const finFields = [input.totalBudgetCr, input.productionBudgetCr].filter(v => v > 0).length
   const confidence = filled >= 4 && finFields >= 2 ? 'high' : filled >= 2 ? 'medium' : 'low'
+  const confidenceInterval = computeConfidenceInterval(components)
 
-  return { totalScore, verdict, components, confidence }
-}
-
-function finGenreRisk(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
-  const gs = stats.genreStats[input.primaryGenre]
-  const wr = gs ? gs.adjustedWinRatePct : 30
-  const score = Math.round(Math.min(wr, 80) / 80 * 10 * 10) / 10
-  return {
-    label: 'Genre Risk', score, maxScore: 10, weight: FW.genreRisk,
-    contribution: score * FW.genreRisk,
-    explanation: `${input.primaryGenre}: ${wr}% adjusted recovery rate`,
-  }
+  return { totalScore, verdict, components, confidence, confidenceInterval }
 }
 
 function finBudgetRisk(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
   const band = budgetBand(input.totalBudgetCr)
   const bd = stats.budgetBandStats[band]
-  const wr = bd ? bd.adjustedWinRatePct : 30
-  const inverted = Math.round(Math.min(100 - wr, 85) / 85 * 10 * 10) / 10
+  const mult = bd ? bd.avgMultiple : 1.0
+  const score = multScore(mult, 3.5)
   return {
-    label: 'Budget Risk', score: 10 - inverted, maxScore: 10, weight: FW.budgetRisk,
-    contribution: (10 - inverted) * FW.budgetRisk,
-    explanation: `${band}: ${wr}% adjusted WR — ${wr >= 40 ? 'lower' : 'higher'} risk`,
+    label: 'Budget Risk', score, maxScore: 10, weight: FW.budgetRisk,
+    contribution: score * FW.budgetRisk, sampleSize: bd?.count ?? 0,
+    explanation: `${band}: avg ${mult.toFixed(2)}x`,
   }
 }
 
 function finGenreBudgetRisk(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
   const key = `${input.primaryGenre}|${budgetBand(input.totalBudgetCr)}`
   const gb = stats.genreBudgetStats[key]
-  const wr = gb ? gb.adjustedWinRatePct : 30
-  const score = Math.round(Math.min(wr, 80) / 80 * 10 * 10) / 10
+  const mult = gb ? gb.avgMultiple : 1.0
+  const score = multScore(mult, 4.0)
   return {
     label: 'Genre-Budget Risk', score, maxScore: 10, weight: FW.genreBudgetRisk,
-    contribution: score * FW.genreBudgetRisk,
-    explanation: gb ? `${key}: ${wr}% adjusted WR` : 'No direct combos',
+    contribution: score * FW.genreBudgetRisk, sampleSize: gb?.count ?? 0,
+    explanation: gb ? `${key}: avg ${mult.toFixed(2)}x` : 'No direct combos',
   }
 }
 
 function finTalentLiquidity(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
   const a = stats.actorTierStats[input.actorTier]
-  const wr = a ? a.adjustedWinRatePct : 25
-  const score = Math.round(Math.min(wr, 80) / 80 * 10 * 10) / 10
+  const mult = a ? a.avgMultiple : 1.0
+  const score = multScore(mult, 4.0)
   return {
     label: 'Talent Liquidity', score, maxScore: 10, weight: FW.talentLiquidity,
-    contribution: score * FW.talentLiquidity,
-    explanation: `${input.actorTier}-tier: ${wr}% adjusted WR`,
+    contribution: score * FW.talentLiquidity, sampleSize: a?.count ?? 0,
+    explanation: `${input.actorTier}-tier: avg ${mult.toFixed(2)}x`,
   }
 }
 
@@ -253,12 +280,26 @@ function finConceptRisk(input: EvaluationInput): ScoreComponent {
 
 function finSeasonalityRisk(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
   const ms = stats.monthStats[input.releaseMonth]
-  const wr = ms ? ms.adjustedWinRatePct : 45
-  const inverted = Math.round(Math.min(100 - wr, 80) / 80 * 10 * 10) / 10
+  const mult = ms ? ms.avgMultiple : 1.5
+  const score = multScore(mult, 3.5)
   return {
-    label: 'Seasonality Risk', score: 10 - inverted, maxScore: 10, weight: FW.seasonalityRisk,
-    contribution: (10 - inverted) * FW.seasonalityRisk,
-    explanation: `${monthName(input.releaseMonth)}: ${wr}% adjusted WR`,
+    label: 'Seasonality Risk', score, maxScore: 10, weight: FW.seasonalityRisk,
+    contribution: score * FW.seasonalityRisk, sampleSize: ms?.count ?? 0,
+    explanation: `${monthName(input.releaseMonth)}: avg ${mult.toFixed(2)}x`,
+  }
+}
+
+function finProductionHouseRisk(input: EvaluationInput, stats: DatasetStats): ScoreComponent {
+  if (!input.productionHouse) return { label: 'Production House Risk', score: 5, maxScore: 10, weight: FW.productionHouseRisk, contribution: 5 * FW.productionHouseRisk, explanation: 'No production house selected' }
+  const ph = stats.productionHouseStats[input.productionHouse]
+  if (!ph || ph.count < 3) {
+    return { label: 'Production House Risk', score: 5, maxScore: 10, weight: FW.productionHouseRisk, contribution: 5 * FW.productionHouseRisk, explanation: `${input.productionHouse}: insufficient data` }
+  }
+  const score = multScore(ph.avgMultiple, 4.0)
+  return {
+    label: 'Production House Risk', score, maxScore: 10, weight: FW.productionHouseRisk,
+    contribution: score * FW.productionHouseRisk, sampleSize: ph.count,
+    explanation: `${input.productionHouse}: avg ${ph.avgMultiple}x (${ph.count} films)`,
   }
 }
 
@@ -292,7 +333,7 @@ export function calculateFinancierRisk(input: EvaluationInput, stats: DatasetSta
     finConceptRisk(input),
     finSeasonalityRisk(input, stats),
     finMarketTiming(input),
-    finProductionRisk(input),
+    finProductionHouseRisk(input, stats),
   ]
 
   components[0].contribution = components[0].score * FW.capitalRecovery
@@ -308,10 +349,13 @@ export function calculateFinancierRisk(input: EvaluationInput, stats: DatasetSta
     ? Math.min(95, Math.round((totalRights / input.totalBudgetCr) * 100))
     : 0
 
+  const confidenceInterval = computeConfidenceInterval(components)
+
   return {
     riskScore,
     riskLevel: inverted >= 70 ? 'very_high' : inverted >= 50 ? 'high' : inverted >= 30 ? 'moderate' : 'low',
     components,
     capitalRecoveryProb,
+    confidenceInterval,
   }
 }

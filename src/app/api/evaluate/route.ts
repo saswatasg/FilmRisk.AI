@@ -5,16 +5,17 @@ import { calculateGreenlightScore, calculateFinancierRisk } from '@/lib/scoring-
 import { findComparableFilms } from '@/lib/comparable-films'
 import { calculateFinancialProjection } from '@/lib/financial-simulator'
 import { diagnoseRisk } from '@/lib/risk-diagnosis'
+import { analyzeSensitivities } from '@/lib/sensitivity-analysis'
+import { computePreSaleBenchmarks } from '@/lib/pre-sale-benchmark'
+import { validateInputBackend, getDataQualityWarnings } from '@/lib/validate-input'
 
 export async function POST(request: NextRequest) {
   try {
     const input: EvaluationInput = await request.json()
 
-    if (!input.primaryGenre || !input.logline || !input.director || !input.leadActor1) {
-      return NextResponse.json(
-        { error: 'Missing required fields: primaryGenre, logline, director, leadActor1' },
-        { status: 400 }
-      )
+    const validationErrors = validateInputBackend(input)
+    if (validationErrors.length > 0) {
+      return NextResponse.json({ error: validationErrors.join('; ') }, { status: 400 })
     }
 
     const { films, stats } = loadDataset()
@@ -24,6 +25,9 @@ export async function POST(request: NextRequest) {
     const comparableFilms = findComparableFilms(input, films, stats, 8)
     const financialProjection = calculateFinancialProjection(input, stats)
     const riskDiagnosis = diagnoseRisk(input, stats)
+    const sensitivities = analyzeSensitivities(input, stats)
+    const preSaleBenchmarks = computePreSaleBenchmarks(input)
+    const dataQualityWarnings = getDataQualityWarnings(input)
 
     const result: EvaluationResult = {
       projectSummary: {
@@ -38,6 +42,10 @@ export async function POST(request: NextRequest) {
       comparableFilms,
       financialProjection,
       riskDiagnosis,
+      sensitivities,
+      preSaleBenchmarks,
+      validationErrors,
+      dataQualityWarnings,
       timestamp: new Date().toISOString(),
     }
 

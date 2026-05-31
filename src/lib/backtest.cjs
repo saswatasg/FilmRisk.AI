@@ -177,8 +177,13 @@ for (const [b, s] of Object.entries(bandStats).sort()) {
   console.log(`  ${b}: ${s.count} films, ${s.rawWR}% → ${s.adjWR}%`);
 }
 
-// --- Scoring functions (matching TS engine v2) ---
-const W = { genre: 0.12, gbFit: 0.07, budget: 0.15, talent: 0.18, preSale: 0.22, concept: 0.10, seasonality: 0.03, timing: 0.08, production: 0.05 };
+// --- Continuous outcome model (matching TS engine v3) ---
+// Uses expected gross multiple (not win rate) for data-backed components
+const W = { genre: 0.12, gbFit: 0.06, budget: 0.14, talent: 0.17, preSale: 0.22, concept: 0.10, seasonality: 0.03, timing: 0.08, production: 0.04, productionHouse: 0.04 };
+
+function multScore(mult, cap) {
+  return Math.round(Math.min(mult / cap, 1) * 10 * 10) / 10;
+}
 
 function estimatePreSale(budget) {
   if (budget > 150) return { score: 7, ratio: 0.55 };
@@ -194,29 +199,28 @@ function predict(film) {
   const ck = film.directorTier + '+' + film.actorTier;
   const cs = comboS[ck];
 
-  const gScore = gs ? Math.round(Math.min(gs.adjWR, 85) / 85 * 10 * 10) / 10 : 5;
-  const gbScore = gb ? Math.round(Math.min(gb.adjWR, 85) / 85 * 10 * 10) / 10 : 5;
-  const bScore = bs ? Math.round(Math.min(bs.adjWR, 75) / 75 * 10 * 10) / 10 : 5;
+  const gScore = gs ? multScore(gs.avgMult, 4.0) : 5;
+  const gbScore = gb ? multScore(gb.avgMult, 4.0) : 5;
+  const bScore = bs ? multScore(bs.avgMult, 3.5) : 5;
   let tScore;
   if (cs) {
-    tScore = Math.round(Math.min(cs.adjWR, 85) / 85 * 10 * 10) / 10;
+    tScore = multScore(cs.avgMult, 4.0);
   } else {
     const a = actorStats[film.actorTier]; const d = dirStats[film.directorTier];
-    const aWR = a ? a.adjWR : 25; const dWR = d ? d.adjWR : 25;
-    tScore = Math.round(Math.min(aWR * 0.45 + dWR * 0.55, 85) / 85 * 10 * 10) / 10;
+    const aM = a ? a.avgMult : 1.0; const dM = d ? d.avgMult : 1.0;
+    tScore = multScore(aM * 0.45 + dM * 0.55, 4.0);
   }
   const p = estimatePreSale(film.budget);
   const conceptScore = 5.5;
   const ms = monthStats[film.releaseMonth];
-  const seasonScore = ms && ms.count >= 3
-    ? Math.round(Math.min(ms.adjWR, 80) / 80 * 10 * 10) / 10
-    : 6;
+  const seasonScore = ms && ms.count >= 3 ? multScore(ms.avgMult, 3.5) : 6;
   const timingScore = 6;
   const prodScore = 7;
+  const phScore = 5;
 
   const raw = gScore * W.genre + gbScore * W.gbFit + bScore * W.budget + tScore * W.talent
     + p.score * W.preSale + conceptScore * W.concept + seasonScore * W.seasonality
-    + timingScore * W.timing + prodScore * W.production;
+    + timingScore * W.timing + prodScore * W.production + phScore * W.productionHouse;
   const total = Math.round(raw * 10 * 10) / 10;
 
   const verdict = total >= 75 ? 'GREENLIGHT' : total >= 50 ? 'CONDITIONAL' : 'DONT_INVEST';
@@ -300,6 +304,101 @@ console.log('\nSample errors:');
 for (const e of errors.slice(0, 12)) {
   console.log(`  ${e.title} (${e.year}): ₹${e.budget}Cr, ${e.mult.toFixed(2)}x, ${e.genre}, actual=${e.actual}, pred=${e.predicted} (score=${e.score})`);
 }
+
+console.log('\n=== WALK-FORWARD VALIDATION (Annual Rolling) ===\n');
+
+const allYears = [...new Set(testable.map(f => f.year))].sort();
+const yearsWithData = allYears.filter(y => testable.filter(f => f.year === y).length >= 5);
+const rollingResults = [];
+
+for (let i = 1; i < yearsWithData.length; i++) {
+  const testYear = yearsWithData[i];
+  const trainYears = yearsWithData.slice(0, i);
+  const wfTrain = testable.filter(f => trainYears.includes(f.year));
+  const wfTest = testable.filter(f => f.year === testYear);
+
+  if (wfTest.length < 3) continue;
+
+  const wfGenre = {}, wfBand = {}, wfGB = {}, wfActor = {}, wfDir = {}, wfCombo = {}, wfMonth = {};
+  for (const f of wfTrain) {
+    const wt = temporalWt(f.year);
+    const band = budgetBand(f.budget);
+    const gbKey = `${f.genre}|${band}`;
+    if (!wfGenre[f.genre]) wfGenre[f.genre] = { w: 0, t: 0, aw: 0, ac: 0 };
+    wfGenre[f.genre].t += wt; if (f.multiple >= 1.5) { wfGenre[f.genre].w += wt; wfGenre[f.genre].aw += 1; } wfGenre[f.genre].ac += 1;
+    if (!wfBand[band]) wfBand[band] = { w: 0, t: 0, aw: 0, ac: 0 };
+    wfBand[band].t += wt; if (f.multiple >= 1.5) { wfBand[band].w += wt; wfBand[band].aw += 1; } wfBand[band].ac += 1;
+    if (!wfGB[gbKey]) wfGB[gbKey] = { w: 0, t: 0, aw: 0, ac: 0 };
+    wfGB[gbKey].t += wt; if (f.multiple >= 1.5) { wfGB[gbKey].w += wt; wfGB[gbKey].aw += 1; } wfGB[gbKey].ac += 1;
+    if (!wfMonth[f.releaseMonth]) wfMonth[f.releaseMonth] = { w: 0, t: 0, aw: 0, ac: 0 };
+    wfMonth[f.releaseMonth].t += wt; if (f.multiple >= 1.5) { wfMonth[f.releaseMonth].w += wt; wfMonth[f.releaseMonth].aw += 1; } wfMonth[f.releaseMonth].ac += 1;
+    if (f.actorTier) {
+      if (!wfActor[f.actorTier]) wfActor[f.actorTier] = { w: 0, t: 0, aw: 0, ac: 0 };
+      wfActor[f.actorTier].t += wt; if (f.multiple >= 1.5) { wfActor[f.actorTier].w += wt; wfActor[f.actorTier].aw += 1; } wfActor[f.actorTier].ac += 1;
+    }
+    if (f.directorTier) {
+      if (!wfDir[f.directorTier]) wfDir[f.directorTier] = { w: 0, t: 0, aw: 0, ac: 0 };
+      wfDir[f.directorTier].t += wt; if (f.multiple >= 1.5) { wfDir[f.directorTier].w += wt; wfDir[f.directorTier].aw += 1; } wfDir[f.directorTier].ac += 1;
+    }
+    if (f.actorTier && f.directorTier) {
+      const ck = f.directorTier + '+' + f.actorTier;
+      if (!wfCombo[ck]) wfCombo[ck] = { w: 0, t: 0, aw: 0, ac: 0 };
+      wfCombo[ck].t += wt; if (f.multiple >= 1.5) { wfCombo[ck].w += wt; wfCombo[ck].aw += 1; } wfCombo[ck].ac += 1;
+    }
+  }
+
+  function wfStats(raw) {
+    return Object.fromEntries(Object.entries(raw).map(([k, v]) => [k, {
+      count: Math.round(v.t), adjWR: bayesianWR(v.aw, v.ac), avgMult: v.t > 0 ? Math.round(v.m / v.t * 100) / 100 : 1.0
+    }]));
+  }
+
+  const wfGenreS = wfStats(wfGenre), wfBandS = wfStats(wfBand), wfGBS = wfStats(wfGB), wfActorS = wfStats(wfActor), wfDirS = wfStats(wfDir), wfComboS = wfStats(wfCombo), wfMonthS = wfStats(wfMonth);
+
+  let wfCorrect = 0, wfTotal = 0;
+  for (const f of wfTest) {
+    const gs = wfGenreS[f.genre];
+    const bs = wfBandS[budgetBand(f.budget)];
+    const gb = wfGBS[`${f.genre}|${budgetBand(f.budget)}`];
+    const ck = f.directorTier + '+' + f.actorTier;
+    const cs = wfComboS[ck];
+    const gScore = gs ? multScore(gs.avgMult || 1.0, 4.0) : 5;
+    const gbScore = gb ? multScore(gb.avgMult || 1.0, 4.0) : 5;
+    const bScore = bs ? multScore(bs.avgMult || 1.0, 3.5) : 5;
+    let tScore;
+    if (cs) {
+      tScore = multScore(cs.avgMult || 1.0, 4.0);
+    } else {
+      const a = wfActorS[f.actorTier]; const d = wfDirS[f.directorTier];
+      const aM = a ? (a.avgMult || 1.0) : 1.0; const dM = d ? (d.avgMult || 1.0) : 1.0;
+      tScore = multScore(aM * 0.45 + dM * 0.55, 4.0);
+    }
+    const p = estimatePreSale(f.budget);
+    const ms = wfMonthS[f.releaseMonth];
+    const seasonScore = ms && ms.count >= 3 ? multScore(ms.avgMult || 1.5, 3.5) : 6;
+    const raw = gScore * W.genre + gbScore * W.gbFit + bScore * W.budget + tScore * W.talent
+      + p.score * W.preSale + 5.5 * W.concept + seasonScore * W.seasonality + 6 * W.timing + 7 * W.production + 5 * W.productionHouse;
+    const total = Math.round(raw * 10 * 10) / 10;
+    const pred = total >= 75 ? 'GREENLIGHT' : total >= 50 ? 'CONDITIONAL' : 'DONT_INVEST';
+    const actual = f.multiple >= 3.0 ? 'BLOCKBUSTER' : f.multiple >= 2.0 ? 'HIT' : f.multiple >= 1.25 ? 'AVERAGE' : f.multiple >= 0.75 ? 'BELOW_AVG' : 'FLOP';
+
+    let correct = false;
+    if (pred === 'GREENLIGHT' && (actual === 'BLOCKBUSTER' || actual === 'HIT')) correct = true;
+    else if (pred === 'CONDITIONAL' && (actual === 'AVERAGE' || actual === 'BELOW_AVG')) correct = true;
+    else if (pred === 'DONT_INVEST' && (actual === 'FLOP' || actual === 'BELOW_AVG')) correct = true;
+    if (correct) wfCorrect++;
+    wfTotal++;
+  }
+
+  const wfAcc = wfTotal > 0 ? (wfCorrect / wfTotal * 100).toFixed(1) : 'N/A';
+  rollingResults.push({ year: testYear, trainYears: trainYears.join('-'), total: wfTotal, correct: wfCorrect, accuracy: wfAcc });
+  console.log(`  ${testYear}: train ${trainYears.join('-')}, test n=${wfTotal}, acc=${wfAcc}% (${wfCorrect}/${wfTotal})`);
+}
+
+const avgWfAcc = rollingResults.length > 0
+  ? (rollingResults.reduce((s, r) => s + parseFloat(r.accuracy), 0) / rollingResults.length).toFixed(1)
+  : 'N/A';
+console.log(`\nWalk-Forward Avg Accuracy: ${avgWfAcc}% (${rollingResults.length} rolling windows)`);
 
 console.log('\n=== NOTE ===');
 console.log('Pre-sale coverage component (22% weight) is estimated from budget bands because');

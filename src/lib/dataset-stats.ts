@@ -10,6 +10,15 @@ export interface GenreStats {
   avgMultiple: number
   winRatePct: number
   adjustedWinRatePct: number
+  recentWinRatePct: number | null
+  trajectory: 'up' | 'down' | 'stable' | null
+}
+
+export interface ProductionHouseStats {
+  count: number
+  withGross: number
+  adjustedWinRatePct: number
+  avgMultiple: number
 }
 
 export interface TierStats {
@@ -50,6 +59,7 @@ export interface DatasetStats {
   budgetBandStats: Record<string, BudgetBandStats>
   genreBudgetStats: Record<string, GenreBudgetInteraction>
   monthStats: Record<number, MonthStats>
+  productionHouseStats: Record<string, ProductionHouseStats>
   grossMultiplePercentiles: { p10: number; p25: number; p50: number; p75: number; p90: number }
 }
 
@@ -85,6 +95,7 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
   const genreBudgetRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number }> = {}
   const comboRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number }> = {}
   const monthRaw: Record<number, { wins: number; total: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number }> = {}
+  const houseRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number }> = {}
 
   for (const f of withFinance) {
     const b = f.budget_cr!
@@ -98,6 +109,7 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
     const dt = f.director_tier_proxy
     const band = budgetBand(b)
     const month = f.release_month_num
+    const house = f.production_house
 
     if (!genreRaw[genre]) genreRaw[genre] = { wins: 0, total: 0, weightedBudget: 0, weightedMultSum: 0, weightedCount: 0, actualWins: 0, actualCount: 0 }
     genreRaw[genre].total += wt
@@ -108,6 +120,12 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
       if (!monthRaw[month]) monthRaw[month] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, actualWins: 0, actualCount: 0 }
       monthRaw[month].total += wt
       monthRaw[month].weightedCount += wt
+    }
+
+    if (house) {
+      if (!houseRaw[house]) houseRaw[house] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, actualWins: 0, actualCount: 0 }
+      houseRaw[house].total += wt
+      houseRaw[house].weightedCount += wt
     }
 
     if (g !== null && g > 0 && mult !== null) {
@@ -135,6 +153,12 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
         monthRaw[month].weightedMultSum += mult * wt
         if (mult >= 1.5) { monthRaw[month].wins += wt; monthRaw[month].actualWins += 1 }
         monthRaw[month].actualCount += 1
+      }
+
+      if (house) {
+        houseRaw[house].weightedMultSum += mult * wt
+        if (mult >= 1.5) { houseRaw[house].wins += wt; houseRaw[house].actualWins += 1 }
+        houseRaw[house].actualCount += 1
       }
     }
 
@@ -183,6 +207,8 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
       avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
       winRatePct: rawWR,
       adjustedWinRatePct: bayesianWR(r.actualWins, r.actualCount),
+      recentWinRatePct: null,
+      trajectory: null,
     }
   }
 
@@ -256,6 +282,38 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
   const sorted = [...allMultiples].sort((a, b) => a - b)
   const len = sorted.length
 
+  const productionHouseStats: Record<string, ProductionHouseStats> = {}
+  for (const [k, r] of Object.entries(houseRaw)) {
+    if (r.actualCount >= 3) {
+      productionHouseStats[k] = {
+        count: Math.round(r.weightedCount),
+        withGross: r.actualCount,
+        adjustedWinRatePct: bayesianWR(r.actualWins, r.actualCount),
+        avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
+      }
+    }
+  }
+
+  const genreTrajectory: Record<string, { recentWR: number | null; trajectory: 'up' | 'down' | 'stable' | null }> = {}
+  for (const [genre, g] of Object.entries(genreStats)) {
+    const recentFilms = withFinance.filter(f => f.primary_genre === genre && f.release_year >= 2023 && f.gross_multiple !== null)
+    const recentWins = recentFilms.filter(f => f.gross_multiple! >= 1.5).length
+    const recentCount = recentFilms.length
+    const recentWR = recentCount >= 3 ? Math.round((recentWins / recentCount) * 100) : null
+    const allWR = g.winRatePct
+    let trajectory: 'up' | 'down' | 'stable' | null = null
+    if (recentWR !== null && allWR > 0) {
+      if (recentWR > allWR + 10) trajectory = 'up'
+      else if (recentWR < allWR - 10) trajectory = 'down'
+      else trajectory = 'stable'
+    }
+    genreTrajectory[genre] = { recentWR, trajectory }
+    if (genreStats[genre]) {
+      genreStats[genre].recentWinRatePct = recentWR
+      genreStats[genre].trajectory = trajectory
+    }
+  }
+
   return {
     genreStats,
     actorTierStats,
@@ -264,6 +322,7 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
     budgetBandStats: bandStats,
     genreBudgetStats,
     monthStats,
+    productionHouseStats,
     grossMultiplePercentiles: {
       p10: sorted[Math.floor(len * 0.1)] ?? 0.17,
       p25: sorted[Math.floor(len * 0.25)] ?? 0.54,
