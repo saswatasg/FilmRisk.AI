@@ -203,7 +203,8 @@ export function calculateGreenlightScore(input: EvaluationInput, stats: DatasetS
     scoreProductionViability(input),
   ]
 
-  const totalScore = Math.round(components.reduce((s, c) => s + c.contribution, 0) * 10) / 10
+  const rawScore = components.reduce((s, c) => s + c.contribution, 0)
+  const totalScore = Math.round(rawScore * 10 * 10) / 10
   const verdict = totalScore >= 70 ? 'greenlight' : totalScore >= 45 ? 'conditional' : 'dont_invest'
 
   const filled = [input.primaryGenre, input.logline, input.director, input.leadActor1].filter(Boolean).length
@@ -313,7 +314,8 @@ export function calculateFinancierRisk(input: EvaluationInput, stats: DatasetSta
   components[0].weight = FINANCIER_WEIGHTS.capitalRecovery
   components[0].contribution = components[0].score * FINANCIER_WEIGHTS.capitalRecovery
 
-  const riskScore = Math.round(components.reduce((s, c) => s + c.contribution, 0) * 10) / 10
+  const rawRisk = components.reduce((s, c) => s + c.contribution, 0)
+  const riskScore = Math.round(rawRisk * 10 * 10) / 10
   const inverted = 100 - riskScore
 
   const totalRights =
