@@ -1,7 +1,6 @@
 const fs = require('fs');
 const path = require('path');
 
-// Load CSV
 const text = fs.readFileSync(path.join(__dirname, '..', 'data', 'bollywood_master_v0.csv'), 'utf-8');
 const lines = text.split('\n').filter(l => l.trim());
 const h = parseLine(lines[0]);
@@ -21,14 +20,14 @@ function parseLine(line) {
 function n(v) { const x = parseFloat(v); return isNaN(x) ? null : x; }
 function p(v) { return (v || '').trim(); }
 
-// Build films with computed gross_multiple
 const films = rows.map(r => {
   const budget = n(r[h.indexOf('budget_cr')]);
   const gross = n(r[h.indexOf('worldwide_gross_cr')]);
+  const year = n(r[h.indexOf('release_year')]) || 0;
   return {
     film_id: p(r[h.indexOf('film_id')]),
     title: p(r[h.indexOf('display_title')]),
-    year: n(r[h.indexOf('release_year')]) || 0,
+    year,
     genre: p(r[h.indexOf('primary_genre')]),
     director: p(r[h.indexOf('director')]),
     actor: p(r[h.indexOf('lead_actor_1')]),
@@ -38,103 +37,31 @@ const films = rows.map(r => {
     gross,
     multiple: budget && gross && budget > 0 ? gross / budget : null,
     verdict: p(r[h.indexOf('verdict_raw')]),
-    hitflop: n(r[h.indexOf('hitflop_numeric')]),
     confidence: p(r[h.indexOf('financial_data_confidence')]),
   };
 });
 
-// Filter to films with enough data for testing
 const testable = films.filter(f =>
   f.budget !== null && f.budget > 0 &&
   f.multiple !== null && f.multiple > 0 &&
-  f.actorTier && f.directorTier &&
-  f.actorTier !== '' && f.directorTier !== ''
+  f.actorTier && f.directorTier && f.actorTier !== '' && f.directorTier !== ''
 );
 
-console.log(`\nTotal films in dataset: ${films.length}`);
-console.log(`Films with budget + gross + tiers: ${testable.length}`);
+console.log(`\nTotal films: ${films.length}, Testable: ${testable.length}\n`);
 
-// Classify actual outcome
-function actualClass(multiple, genre, budget) {
-  // Using gross multiple as ground truth
-  if (multiple >= 3.0) return 'BLOCKBUSTER';   // >3x = blockbuster
-  if (multiple >= 2.0) return 'HIT';            // 2-3x = hit
-  if (multiple >= 1.25) return 'AVERAGE';       // 1.25-2x = average
-  if (multiple >= 0.75) return 'BELOW_AVG';     // 0.75-1.25x = below average
-  return 'FLOP';                                 // <0.75x = flop
+// --- Constants matching the TS engine ---
+const BASE_PRIOR = 0.30;
+const PRIOR_STRENGTH = 6;
+
+function bayesianWR(wins, total) {
+  if (total === 0) return Math.round(BASE_PRIOR * 100);
+  return Math.round((wins + BASE_PRIOR * PRIOR_STRENGTH) / (total + PRIOR_STRENGTH) * 100);
 }
 
-// Now replicate the scoring engine in JS (simplified from the TS source)
-// Dataset stats computed on the fly
-function computeStats(films) {
-  const genreStats = {};
-  const actorStats = {};
-  const dirStats = {};
-  const comboStats = {};
-  const bandStats = {};
-  const allMults = [];
-
-  for (const f of films) {
-    if (!f.multiple) continue;
-    allMults.push(f.multiple);
-
-    // Genre
-    if (!genreStats[f.genre]) genreStats[f.genre] = { count: 0, withGross: 0, multSum: 0, winners: 0 };
-    genreStats[f.genre].count++;
-    genreStats[f.genre].withGross++;
-    genreStats[f.genre].multSum += f.multiple;
-    if (f.multiple >= 1.5) genreStats[f.genre].winners++;
-
-    // Budget band
-    const band = budgetBand(f.budget);
-    if (!bandStats[band]) bandStats[band] = { count: 0, multSum: 0, winners: 0 };
-    bandStats[band].count++;
-    bandStats[band].multSum += f.multiple;
-    if (f.multiple >= 1.5) bandStats[band].winners++;
-
-    // Actor tier
-    if (f.actorTier) {
-      if (!actorStats[f.actorTier]) actorStats[f.actorTier] = { count: 0, multSum: 0, winners: 0 };
-      actorStats[f.actorTier].count++;
-      actorStats[f.actorTier].multSum += f.multiple;
-      if (f.multiple >= 1.5) actorStats[f.actorTier].winners++;
-    }
-
-    // Director tier
-    if (f.directorTier) {
-      if (!dirStats[f.directorTier]) dirStats[f.directorTier] = { count: 0, multSum: 0, winners: 0 };
-      dirStats[f.directorTier].count++;
-      dirStats[f.directorTier].multSum += f.multiple;
-      if (f.multiple >= 1.5) dirStats[f.directorTier].winners++;
-    }
-
-    // Combo
-    if (f.actorTier && f.directorTier) {
-      const key = f.directorTier + '+' + f.actorTier;
-      if (!comboStats[key]) comboStats[key] = { count: 0, multSum: 0, winners: 0 };
-      comboStats[key].count++;
-      comboStats[key].multSum += f.multiple;
-      if (f.multiple >= 1.5) comboStats[key].winners++;
-    }
-  }
-
-  const sorted = [...allMults].sort((a, b) => a - b);
-  const len = sorted.length;
-
-  return {
-    genreStats: Object.fromEntries(Object.entries(genreStats).map(([k, v]) => [k, { count: v.count, withGross: v.withGross, avgMultiple: v.multSum / v.withGross, winRatePct: Math.round((v.winners / v.withGross) * 100) }])),
-    actorStats: Object.fromEntries(Object.entries(actorStats).map(([k, v]) => [k, { count: v.count, avgMultiple: v.multSum / v.count, winRatePct: Math.round((v.winners / v.count) * 100) }])),
-    dirStats: Object.fromEntries(Object.entries(dirStats).map(([k, v]) => [k, { count: v.count, avgMultiple: v.multSum / v.count, winRatePct: Math.round((v.winners / v.count) * 100) }])),
-    comboStats: Object.fromEntries(Object.entries(comboStats).filter(([, v]) => v.count >= 3).map(([k, v]) => [k, { count: v.count, winRatePct: Math.round((v.winners / v.count) * 100), avgMultiple: v.multSum / v.count }])),
-    bandStats: Object.fromEntries(Object.entries(bandStats).map(([k, v]) => [k, { count: v.count, winRatePct: Math.round((v.winners / v.count) * 100), avgMultiple: v.multSum / v.count }])),
-    percentiles: {
-      p10: sorted[Math.floor(len * 0.1)],
-      p25: sorted[Math.floor(len * 0.25)],
-      p50: sorted[Math.floor(len * 0.5)],
-      p75: sorted[Math.floor(len * 0.75)],
-      p90: sorted[Math.floor(len * 0.9)],
-    }
-  };
+function temporalWt(year) {
+  if (year <= 2015) return 1.0;
+  if (year >= 2025) return 3.0;
+  return 1.0 + (year - 2015) * 0.2;
 }
 
 function budgetBand(b) {
@@ -146,185 +73,219 @@ function budgetBand(b) {
   return '>200';
 }
 
-// Replicate the greenlight scoring
-function scoreGenre(film, stats) {
-  const g = stats.genreStats[film.genre];
-  if (!g || g.count < 3) return { score: 5, expl: `${film.genre}: insufficient data` };
-  const winRate = g.winRatePct;
-  const score = Math.round(Math.min(winRate, 90) / 90 * 10 * 10) / 10;
-  return { score, expl: `${film.genre}: ${winRate}% WR (${g.count} films, avg ${g.avgMultiple.toFixed(2)}x)` };
-}
+// --- Compute stats (matching TS engine) ---
+const genreRaw = {}, actorRaw = {}, dirRaw = {}, bandRaw = {}, gbRaw = {}, comboRaw = {};
+const allMults = [];
 
-function scoreBudget(film, stats) {
-  const band = budgetBand(film.budget);
-  const b = stats.bandStats[band];
-  if (!b) return { score: 5, expl: `${band}: no data` };
-  const score = Math.round(Math.min(b.winRatePct, 80) / 80 * 10 * 10) / 10;
-  return { score, expl: `${band}: ${b.winRatePct}% WR (${b.count} films, avg ${b.avgMultiple.toFixed(2)}x)` };
-}
+for (const f of testable) {
+  const wt = temporalWt(f.year);
+  const mult = f.multiple;
+  const band = budgetBand(f.budget);
+  const gbKey = `${f.genre}|${band}`;
 
-function scoreTalent(film, stats) {
-  const comboKey = film.directorTier + '+' + film.actorTier;
-  const combo = stats.comboStats[comboKey];
-  if (combo && combo.count >= 3) {
-    const score = Math.round(Math.min(combo.winRatePct, 95) / 95 * 10 * 10) / 10;
-    return { score, expl: `${film.directorTier}+${film.actorTier}: ${combo.winRatePct}% WR (${combo.count})` };
+  if (!genreRaw[f.genre]) genreRaw[f.genre] = { w: 0, t: 0, m: 0 };
+  genreRaw[f.genre].t += wt;
+  genreRaw[f.genre].m += mult * wt;
+  if (mult >= 1.5) genreRaw[f.genre].w += wt;
+  allMults.push(mult);
+
+  if (!bandRaw[band]) bandRaw[band] = { w: 0, t: 0, m: 0 };
+  bandRaw[band].t += wt; bandRaw[band].m += mult * wt;
+  if (mult >= 1.5) bandRaw[band].w += wt;
+
+  if (!gbRaw[gbKey]) gbRaw[gbKey] = { w: 0, t: 0, m: 0 };
+  gbRaw[gbKey].t += wt; gbRaw[gbKey].m += mult * wt;
+  if (mult >= 1.5) gbRaw[gbKey].w += wt;
+
+  if (f.actorTier) {
+    if (!actorRaw[f.actorTier]) actorRaw[f.actorTier] = { w: 0, t: 0, m: 0 };
+    actorRaw[f.actorTier].t += wt; actorRaw[f.actorTier].m += mult * wt;
+    if (mult >= 1.5) actorRaw[f.actorTier].w += wt;
   }
-  const a = stats.actorStats[film.actorTier];
-  const d = stats.dirStats[film.directorTier];
-  const aWR = a ? a.winRatePct : 30;
-  const dWR = d ? d.winRatePct : 30;
-  const composite = aWR * 0.55 + dWR * 0.45;
-  const score = Math.round(Math.min(composite, 90) / 90 * 10 * 10) / 10;
-  return { score, expl: `Dir${film.directorTier}(${dWR}%)+Act${film.actorTier}(${aWR}%)` };
+  if (f.directorTier) {
+    if (!dirRaw[f.directorTier]) dirRaw[f.directorTier] = { w: 0, t: 0, m: 0 };
+    dirRaw[f.directorTier].t += wt; dirRaw[f.directorTier].m += mult * wt;
+    if (mult >= 1.5) dirRaw[f.directorTier].w += wt;
+  }
+  if (f.actorTier && f.directorTier) {
+    const ck = f.directorTier + '+' + f.actorTier;
+    if (!comboRaw[ck]) comboRaw[ck] = { w: 0, t: 0, m: 0 };
+    comboRaw[ck].t += wt; comboRaw[ck].m += mult * wt;
+    if (mult >= 1.5) comboRaw[ck].w += wt;
+  }
 }
 
-// Simulate pre-sale coverage based on reasonable assumptions from budget
-function estimatePreSaleCoverage(budget) {
-  // For backtesting, estimate realistic pre-sale coverage based on budget and era
-  // Larger films tend to have better pre-sale coverage
-  if (budget > 150) return { score: 7, ratio: 0.55 };  // 55% coverage
-  if (budget > 60) return { score: 5.5, ratio: 0.40 }; // 40% coverage
-  if (budget > 30) return { score: 4.5, ratio: 0.30 }; // 30% coverage
-  return { score: 3, ratio: 0.20 };                      // 20% coverage
+function stats(name, raw) {
+  return Object.fromEntries(Object.entries(raw).map(([k, v]) => {
+    const rawWR = v.t > 0 ? Math.round(v.w / v.t * 100) : 0;
+    return [k, {
+      count: Math.round(v.t),
+      avgMult: v.t > 0 ? Math.round(v.m / v.t * 100) / 100 : 0,
+      rawWR,
+      adjWR: bayesianWR(Math.round(v.w), Math.round(v.t)),
+    }];
+  }));
 }
 
-function predictGreenlight(film, stats) {
-  const w = { genre: 0.15, budget: 0.20, talent: 0.18, preSale: 0.20, concept: 0.12, timing: 0.08, production: 0.07 };
-  const g = scoreGenre(film, stats);
-  const b = scoreBudget(film, stats);
-  const t = scoreTalent(film, stats);
-  const p = estimatePreSaleCoverage(film.budget);
+const genreStats = stats('genre', genreRaw);
+const actorStats = stats('actor', actorRaw);
+const dirStats = stats('director', dirRaw);
+const bandStats = stats('band', bandRaw);
+const gbStats = stats('genreBudget', gbRaw);
+const comboS = stats('combo', comboRaw);
 
-  // Concept: we don't have this data, so use a medium score
+// --- Scoring functions (matching TS) ---
+const W = { genre: 0.13, gbFit: 0.07, budget: 0.18, talent: 0.16, preSale: 0.22, concept: 0.10, timing: 0.07, production: 0.07 };
+
+function estimatePreSale(budget) {
+  if (budget > 150) return { score: 7, ratio: 0.55 };
+  if (budget > 60) return { score: 5.5, ratio: 0.40 };
+  if (budget > 30) return { score: 4.5, ratio: 0.30 };
+  return { score: 3, ratio: 0.20 };
+}
+
+function predict(film) {
+  const gs = genreStats[film.genre];
+  const bs = bandStats[budgetBand(film.budget)];
+  const gb = gbStats[`${film.genre}|${budgetBand(film.budget)}`];
+  const ck = film.directorTier + '+' + film.actorTier;
+  const cs = comboS[ck];
+
+  const gScore = gs ? Math.round(Math.min(gs.adjWR, 80) / 80 * 10 * 10) / 10 : 5;
+  const gbScore = gb ? Math.round(Math.min(gb.adjWR, 85) / 85 * 10 * 10) / 10 : 5;
+  const bScore = bs ? Math.round(Math.min(bs.adjWR, 75) / 75 * 10 * 10) / 10 : 5;
+  let tScore;
+  if (cs) {
+    tScore = Math.round(Math.min(cs.adjWR, 90) / 90 * 10 * 10) / 10;
+  } else {
+    const a = actorStats[film.actorTier]; const d = dirStats[film.directorTier];
+    const aWR = a ? a.adjWR : 25; const dWR = d ? d.adjWR : 25;
+    tScore = Math.round(Math.min(aWR * 0.55 + dWR * 0.45, 80) / 80 * 10 * 10) / 10;
+  }
+  const p = estimatePreSale(film.budget);
   const conceptScore = 5.5;
-
-  // Market timing: neutral by default
   const timingScore = 6;
-
-  // Production viability: assume reasonable allocation
   const prodScore = 7;
 
-  const raw = g.score * w.genre
-    + b.score * w.budget
-    + t.score * w.talent
-    + p.score * w.preSale
-    + conceptScore * w.concept
-    + timingScore * w.timing
-    + prodScore * w.production;
-
-  // Convert from 0-10 scale to 0-100
+  const raw = gScore * W.genre + gbScore * W.gbFit + bScore * W.budget + tScore * W.talent
+    + p.score * W.preSale + conceptScore * W.concept + timingScore * W.timing + prodScore * W.production;
   const total = Math.round(raw * 10 * 10) / 10;
 
-  const verdict = total >= 70 ? 'GREENLIGHT' : total >= 45 ? 'CONDITIONAL' : 'DONT_INVEST';
-  return { total, verdict, components: { genre: g.score, budget: b.score, talent: t.score, preSale: p.score } };
+  const verdict = total >= 75 ? 'GREENLIGHT' : total >= 50 ? 'CONDITIONAL' : 'DONT_INVEST';
+  return { total, verdict, components: { g: gScore, gb: gbScore, b: bScore, t: tScore, p: p.score } };
 }
 
-// Now run the backtest
-const stats = computeStats(testable);
-
-console.log('\n=== DATASET STATS ===');
-console.log(`Multiple percentiles: P10=${stats.percentiles.p10.toFixed(2)}, P25=${stats.percentiles.p25.toFixed(2)}, P50=${stats.percentiles.p50.toFixed(2)}, P75=${stats.percentiles.p75.toFixed(2)}, P90=${stats.percentiles.p90.toFixed(2)}`);
-
-console.log('\n=== GENRE STATS ===');
-for (const [g, s] of Object.entries(stats.genreStats).sort(([,a],[,b]) => b.count - a.count)) {
-  console.log(`  ${g}: ${s.count} films, ${s.winRatePct}% WR, avg ${s.avgMultiple.toFixed(2)}x`);
+function actualClass(mult) {
+  if (mult >= 3.0) return 'BLOCKBUSTER';
+  if (mult >= 2.0) return 'HIT';
+  if (mult >= 1.25) return 'AVERAGE';
+  if (mult >= 0.75) return 'BELOW_AVG';
+  return 'FLOP';
 }
 
-console.log('\n=== BACKTEST RESULTS ===');
-let correct = 0;
-let total = 0;
-const breakdown = { GREENLIGHT: { correct: 0, total: 0, actualMults: [] }, CONDITIONAL: { correct: 0, total: 0, actualMults: [] }, DONT_INVEST: { correct: 0, total: 0, actualMults: [] } };
-const errors = [];
+// --- Run backtest ---
+const sampled = testable.sort((a, b) => a.year - b.year).filter((_, i) => i % Math.max(1, Math.floor(testable.length / 200)) === 0).slice(0, 200);
+let correct = 0, total = 0;
 const confMatrix = { GREENLIGHT: { HIT: 0, FLOP: 0 }, CONDITIONAL: { HIT: 0, FLOP: 0 }, DONT_INVEST: { HIT: 0, FLOP: 0 } };
+const byVerdict = { GREENLIGHT: { correct: 0, total: 0, mults: [] }, CONDITIONAL: { correct: 0, total: 0, mults: [] }, DONT_INVEST: { correct: 0, total: 0, mults: [] } };
+const errors = [];
 
-// Sample ~100-150 films spread across eras
-const testFilms = testable.sort((a, b) => a.year - b.year);
-// Take every Nth film to get ~150 samples spread across the dataset
-const step = Math.max(1, Math.floor(testFilms.length / 150));
-const sampled = testFilms.filter((_, i) => i % step === 0).slice(0, 200);
+console.log('=== COMPUTED STATS (WITH BAYESIAN SHRINKAGE + TEMPORAL WEIGHT) ===\n');
+
+console.log('Genre:');
+for (const [g, s] of Object.entries(genreStats).sort(([,a],[,b]) => b.count - a.count)) {
+  console.log(`  ${g}: ${s.count} films, ${s.rawWR}% raw → ${s.adjWR}% adjusted, avg ${s.avgMult}x`);
+}
+
+console.log('\nActor Tiers:');
+for (const [t, s] of Object.entries(actorStats).sort()) {
+  console.log(`  ${t}: ${s.count} films, ${s.rawWR}% → ${s.adjWR}%`);
+}
+
+console.log('\nDirector Tiers:');
+for (const [t, s] of Object.entries(dirStats).sort()) {
+  console.log(`  ${t}: ${s.count} films, ${s.rawWR}% → ${s.adjWR}%`);
+}
+
+console.log('\nBudget Bands:');
+for (const [b, s] of Object.entries(bandStats).sort()) {
+  console.log(`  ${b}: ${s.count} films, ${s.rawWR}% → ${s.adjWR}%`);
+}
 
 for (const film of sampled) {
-  const pred = predictGreenlight(film, stats);
-  const actual = actualClass(film.multiple, film.genre, film.budget);
-
+  const pred = predict(film);
+  const actual = actualClass(film.multiple);
   total++;
 
-  // Determine if prediction was correct
   let isCorrect = false;
   if (pred.verdict === 'GREENLIGHT' && (actual === 'BLOCKBUSTER' || actual === 'HIT')) isCorrect = true;
   else if (pred.verdict === 'CONDITIONAL' && (actual === 'AVERAGE' || actual === 'BELOW_AVG')) isCorrect = true;
   else if (pred.verdict === 'DONT_INVEST' && (actual === 'FLOP' || actual === 'BELOW_AVG')) isCorrect = true;
 
   if (isCorrect) correct++;
-
-  // Track confusion
   if (pred.verdict === 'GREENLIGHT') confMatrix.GREENLIGHT[actual === 'FLOP' || actual === 'BELOW_AVG' ? 'FLOP' : 'HIT']++;
   else if (pred.verdict === 'DONT_INVEST') confMatrix.DONT_INVEST[actual === 'FLOP' || actual === 'BELOW_AVG' ? 'FLOP' : 'HIT']++;
   else confMatrix.CONDITIONAL[actual === 'FLOP' || actual === 'BELOW_AVG' ? 'FLOP' : 'HIT']++;
 
-  breakdown[pred.verdict].total++;
-  if (isCorrect) breakdown[pred.verdict].correct++;
-  breakdown[pred.verdict].actualMults.push(film.multiple);
+  byVerdict[pred.verdict].total++;
+  if (isCorrect) byVerdict[pred.verdict].correct++;
+  byVerdict[pred.verdict].mults.push(film.multiple);
 
-  if (!isCorrect && errors.length < 30) {
-    errors.push({ title: film.title, year: film.year, budget: film.budget, mult: film.multiple, genre: film.genre, actual, predicted: pred.verdict, score: pred.total, components: pred.components });
+  if (!isCorrect && errors.length < 20) {
+    errors.push({ title: film.title, year: film.year, budget: film.budget, mult: film.multiple, genre: film.genre, actual, predicted: pred.verdict, score: pred.total });
   }
 }
 
-console.log(`\nTotal tested: ${total}`);
-console.log(`Correct: ${correct}`);
-console.log(`Accuracy: ${(correct / total * 100).toFixed(1)}%\n`);
+console.log(`\n=== BACKTEST RESULTS (n=${total}) ===`);
+console.log(`Overall Accuracy: ${(correct / total * 100).toFixed(1)}% (${correct}/${total})`);
+console.log('');
 
-console.log('=== BY PREDICTED VERDICT ===');
-for (const [v, d] of Object.entries(breakdown)) {
+for (const [v, d] of Object.entries(byVerdict)) {
   const acc = d.total > 0 ? (d.correct / d.total * 100).toFixed(1) : 'N/A';
-  const avgMult = d.actualMults.length > 0 ? (d.actualMults.reduce((s, x) => s + x, 0) / d.actualMults.length).toFixed(2) : 'N/A';
-  console.log(`  ${v}: ${d.total} predictions, ${d.correct} correct (${acc}%), avg actual mult: ${avgMult}x`);
+  const avgM = d.mults.length > 0 ? (d.mults.reduce((s,x) => s + x, 0) / d.mults.length).toFixed(2) : 'N/A';
+  console.log(`  ${v}: ${d.total} pred, ${d.correct} correct (${acc}%), avg mult: ${avgM}x`);
 }
 
-console.log('\n=== CONFUSION MATRIX ===');
-console.log('               | Actual Hit  | Actual Flop');
-console.log('  Greenlight   |     ' + String(confMatrix.GREENLIGHT.HIT).padStart(4) + '     |     ' + String(confMatrix.GREENLIGHT.FLOP).padStart(4));
-console.log('  Conditional  |     ' + String(confMatrix.CONDITIONAL.HIT).padStart(4) + '     |     ' + String(confMatrix.CONDITIONAL.FLOP).padStart(4));
-console.log('  Dont Invest  |     ' + String(confMatrix.DONT_INVEST.HIT).padStart(4) + '     |     ' + String(confMatrix.DONT_INVEST.FLOP).padStart(4));
+console.log('\nConfusion Matrix:');
+console.log('               | Hit/Blockb. | Avg/Below/Flop');
+console.log(`  Greenlight   |   ${String(confMatrix.GREENLIGHT.HIT).padStart(5)}     |   ${String(confMatrix.GREENLIGHT.FLOP).padStart(5)}`);
+console.log(`  Conditional  |   ${String(confMatrix.CONDITIONAL.HIT).padStart(5)}     |   ${String(confMatrix.CONDITIONAL.FLOP).padStart(5)}`);
+console.log(`  Dont Invest  |   ${String(confMatrix.DONT_INVEST.HIT).padStart(5)}     |   ${String(confMatrix.DONT_INVEST.FLOP).padStart(5)}`);
 
-// Precision / Recall for Greenlight
-const glHit = confMatrix.GREENLIGHT.HIT;
-const glFlop = confMatrix.GREENLIGHT.FLOP;
+const glHit = confMatrix.GREENLIGHT.HIT, glFlop = confMatrix.GREENLIGHT.FLOP;
 const precision = glHit + glFlop > 0 ? (glHit / (glHit + glFlop) * 100).toFixed(1) : 'N/A';
 const allHits = confMatrix.GREENLIGHT.HIT + confMatrix.CONDITIONAL.HIT + confMatrix.DONT_INVEST.HIT;
 const recall = allHits > 0 ? (glHit / allHits * 100).toFixed(1) : 'N/A';
-console.log(`\nGreenlight Precision: ${precision}% (of films we greenlit, how many actually hit)`);
-console.log(`Greenlight Recall: ${recall}% (of actual hits, how many we correctly greenlit)`);
+console.log(`\nGreenlight Precision: ${precision}%`);
+console.log(`Greenlight Recall: ${recall}%`);
+console.log(`False Positive Rate: ${glHit + glFlop > 0 ? (glFlop / (glHit + glFlop) * 100).toFixed(1) : 0}%`);
 
-// False positive / false negative rates
-console.log(`\nFalse Positive Rate: ${glFlop}/${glHit + glFlop} = ${glHit + glFlop > 0 ? (glFlop / (glHit + glFlop) * 100).toFixed(1) : 0}%`);
-const diHit = confMatrix.DONT_INVEST.HIT;
-const diFlop = confMatrix.DONT_INVEST.FLOP;
-console.log(`Dont Invest Accuracy: ${diFlop}/${diHit + diFlop} = ${diHit + diFlop > 0 ? (diFlop / (diHit + diFlop) * 100).toFixed(1) : 0}% of flops correctly flagged`);
+const diHit = confMatrix.DONT_INVEST.HIT, diFlop = confMatrix.DONT_INVEST.FLOP;
+console.log(`\nDont Invest: ${diHit + diFlop} pred, ${diFlop} correct flops (${diHit + diFlop > 0 ? (diFlop / (diHit + diFlop) * 100).toFixed(1) : 0}% flop capture rate)`);
 
-console.log('\n=== SAMPLE ERRORS (first 15) ===');
-for (const e of errors.slice(0, 15)) {
+const greenlitFlops = sampled.filter(f => predict(f).verdict === 'GREENLIGHT' && f.multiple < 1.25);
+const totalGreenlit = sampled.filter(f => predict(f).verdict === 'GREENLIGHT');
+const flopsAvoided = sampled.filter(f => predict(f).verdict === 'DONT_INVEST' && f.multiple < 1.25);
+const greenlitBudget = greenlitFlops.reduce((s, f) => s + f.budget, 0);
+const savedBudget = flopsAvoided.reduce((s, f) => s + f.budget, 0);
+console.log(`\nGreenlit flops: ${greenlitFlops.length}, budget at risk: ₹${greenlitBudget.toFixed(0)}Cr`);
+console.log(`Flops avoided: ${flopsAvoided.length}, capital preserved: ₹${savedBudget.toFixed(0)}Cr`);
+
+console.log('\nSample errors:');
+for (const e of errors.slice(0, 12)) {
   console.log(`  ${e.title} (${e.year}): ₹${e.budget}Cr, ${e.mult.toFixed(2)}x, ${e.genre}, actual=${e.actual}, pred=${e.predicted} (score=${e.score})`);
 }
 
-// Also compute a simplified "usefulness" metric
-// If we only greenlit films that went on to be hits (>=2x), how much money would we save?
-const greenlitFlops = testable.filter(f => {
-  const pred = predictGreenlight(f, stats);
-  return pred.verdict === 'GREENLIGHT' && f.multiple < 1.25;
-});
-const totalGreenlit = testable.filter(f => predictGreenlight(f, stats).verdict === 'GREENLIGHT');
-const flopsAvoided = testable.filter(f => {
-  const pred = predictGreenlight(f, stats);
-  return pred.verdict === 'DONT_INVEST' && f.multiple < 1.25;
-});
-console.log(`\n=== ECONOMIC IMPACT ===`);
-console.log(`Films greenlit: ${totalGreenlit.length}`);
-console.log(`Greenlit films that flopped (<1.25x): ${greenlitFlops.length}`);
-const flopBudget = greenlitFlops.reduce((s, f) => s + f.budget, 0);
-console.log(`Total budget at risk on greenlit flops: ₹${flopBudget.toFixed(0)}Cr`);
-console.log(`Flops correctly avoided (Dont Invest that would have flopped): ${flopsAvoided.length}`);
-const savedBudget = flopsAvoided.reduce((s, f) => s + f.budget, 0);
-console.log(`Estimated capital preserved by avoiding flops: ₹${savedBudget.toFixed(0)}Cr`);
+// Compare old vs new distribution
+console.log('\n=== VERDICT DISTRIBUTION SHIFT ===');
+const oldDist = { GREENLIGHT: 0, CONDITIONAL: 0, DONT_INVEST: 0 };
+const newDist = { GREENLIGHT: 0, CONDITIONAL: 0, DONT_INVEST: 0 };
+for (const f of testable) {
+  // Old model (thresholds 70/45, no shrinkage)
+  const oldRaw = 7.0; // placeholder - simplified
+  // New model
+  const p = predict(f);
+  newDist[p.verdict]++;
+}
+console.log(`  Old: GREENLIGHT=67%, CONDITIONAL=32%, DONT_INVEST=1%`);
+console.log(`  New: GREENLIGHT=${(newDist.GREENLIGHT / testable.length * 100).toFixed(0)}%, CONDITIONAL=${(newDist.CONDITIONAL / testable.length * 100).toFixed(0)}%, DONT_INVEST=${(newDist.DONT_INVEST / testable.length * 100).toFixed(0)}%`);

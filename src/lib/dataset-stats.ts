@@ -1,11 +1,15 @@
 import type { BollywoodFilm } from './types'
 
+const BASE_SUCCESS_PRIOR = 0.30
+const PRIOR_STRENGTH = 6
+
 export interface GenreStats {
   count: number
   withGross: number
   avgBudget: number
   avgMultiple: number
   winRatePct: number
+  adjustedWinRatePct: number
 }
 
 export interface TierStats {
@@ -13,12 +17,21 @@ export interface TierStats {
   withGross: number
   avgMultiple: number
   winRatePct: number
+  adjustedWinRatePct: number
   avgScore: number
 }
 
 export interface BudgetBandStats {
   count: number
   winRatePct: number
+  adjustedWinRatePct: number
+  avgMultiple: number
+}
+
+export interface GenreBudgetInteraction {
+  count: number
+  winRatePct: number
+  adjustedWinRatePct: number
   avgMultiple: number
 }
 
@@ -26,174 +39,197 @@ export interface DatasetStats {
   genreStats: Record<string, GenreStats>
   actorTierStats: Record<string, TierStats>
   directorTierStats: Record<string, TierStats>
-  comboStats: Record<string, { count: number; winRatePct: number; avgMultiple: number }>
+  comboStats: Record<string, { count: number; winRatePct: number; adjustedWinRatePct: number; avgMultiple: number }>
   budgetBandStats: Record<string, BudgetBandStats>
+  genreBudgetStats: Record<string, GenreBudgetInteraction>
   grossMultiplePercentiles: { p10: number; p25: number; p50: number; p75: number; p90: number }
-  genreBudgetAdjustedWinRates: Record<string, number>
+}
+
+function bayesianWR(wins: number, total: number, prior: number = BASE_SUCCESS_PRIOR, strength: number = PRIOR_STRENGTH): number {
+  if (total === 0) return Math.round(prior * 100)
+  const adjusted = (wins + prior * strength) / (total + strength)
+  return Math.round(adjusted * 100)
+}
+
+function temporalWeight(year: number): number {
+  if (year <= 2015) return 1.0
+  if (year >= 2025) return 3.0
+  return 1.0 + (year - 2015) * 0.2
+}
+
+function budgetBand(b: number): string {
+  if (b < 10) return '<10'
+  if (b < 30) return '10-30'
+  if (b < 60) return '30-60'
+  if (b < 100) return '60-100'
+  if (b < 200) return '100-200'
+  return '>200'
 }
 
 export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
   const withFinance = films.filter(f => f.budget_cr !== null && f.budget_cr > 0)
-
-  const genreMap: Record<string, GenreStats & { winners: number }> = {}
-  const actorTierMap: Record<string, TierStats & { winners: number }> = {}
-  const directorTierMap: Record<string, TierStats & { winners: number }> = {}
-  const comboMap: Record<string, { count: number; withGross: number; winners: number; totalMult: number }> = {}
-  const bandMap: Record<string, { count: number; winRatePct: number; avgMultiple: number; totalBudget: number; winners: number; withData: number }> = {
-    '<10': { count: 0, winRatePct: 0, avgMultiple: 0, totalBudget: 0, winners: 0, withData: 0 },
-    '10-30': { count: 0, winRatePct: 0, avgMultiple: 0, totalBudget: 0, winners: 0, withData: 0 },
-    '30-60': { count: 0, winRatePct: 0, avgMultiple: 0, totalBudget: 0, winners: 0, withData: 0 },
-    '60-100': { count: 0, winRatePct: 0, avgMultiple: 0, totalBudget: 0, winners: 0, withData: 0 },
-    '100-200': { count: 0, winRatePct: 0, avgMultiple: 0, totalBudget: 0, winners: 0, withData: 0 },
-    '>200': { count: 0, winRatePct: 0, avgMultiple: 0, totalBudget: 0, winners: 0, withData: 0 },
-  }
   const allMultiples: number[] = []
 
-  function budgetBand(b: number): string {
-    if (b < 10) return '<10'
-    if (b < 30) return '10-30'
-    if (b < 60) return '30-60'
-    if (b < 100) return '60-100'
-    if (b < 200) return '100-200'
-    return '>200'
-  }
+  const genreRaw: Record<string, { wins: number; total: number; weightedBudget: number; weightedMultSum: number; weightedCount: number }> = {}
+  const actorRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; scoreSum: number }> = {}
+  const dirRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number; scoreSum: number }> = {}
+  const bandRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number }> = {}
+  const genreBudgetRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number }> = {}
+  const comboRaw: Record<string, { wins: number; total: number; weightedMultSum: number; weightedCount: number }> = {}
 
   for (const f of withFinance) {
     const b = f.budget_cr!
     const g = f.worldwide_gross_cr
     const mult = f.gross_multiple
+    const year = f.release_year
+    const wt = temporalWeight(year)
+
     const genre = f.primary_genre
     const at = f.actor_tier_proxy
     const dt = f.director_tier_proxy
+    const band = budgetBand(b)
 
-    if (!genreMap[genre]) genreMap[genre] = { count: 0, withGross: 0, avgBudget: 0, avgMultiple: 0, winRatePct: 0, winners: 0 }
-    genreMap[genre].count++
-    genreMap[genre].avgBudget += b
+    if (!genreRaw[genre]) genreRaw[genre] = { wins: 0, total: 0, weightedBudget: 0, weightedMultSum: 0, weightedCount: 0 }
+    genreRaw[genre].total += wt
+    genreRaw[genre].weightedBudget += b * wt
+    genreRaw[genre].weightedCount += wt
 
     if (g !== null && g > 0 && mult !== null) {
-      genreMap[genre].withGross++
-      genreMap[genre].avgMultiple += mult
-      if (mult >= 1.5) genreMap[genre].winners++
-    }
-
-    const band = budgetBand(b)
-    if (bandMap[band]) {
-      bandMap[band].count++
-      bandMap[band].totalBudget += b
-      if (mult !== null) {
-        bandMap[band].withData++
-        bandMap[band].avgMultiple += mult
-        if (mult >= 1.5) bandMap[band].winners++
-      }
-    }
-
-    if (mult !== null) {
+      genreRaw[genre].weightedMultSum += mult * wt
+      if (mult >= 1.5) genreRaw[genre].wins += wt
       allMultiples.push(mult)
+
+      if (!bandRaw[band]) bandRaw[band] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0 }
+      bandRaw[band].total += wt
+      bandRaw[band].weightedMultSum += mult * wt
+      bandRaw[band].weightedCount += wt
+      if (mult >= 1.5) bandRaw[band].wins += wt
+
+      const gbKey = `${genre}|${band}`
+      if (!genreBudgetRaw[gbKey]) genreBudgetRaw[gbKey] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0 }
+      genreBudgetRaw[gbKey].total += wt
+      genreBudgetRaw[gbKey].weightedMultSum += mult * wt
+      genreBudgetRaw[gbKey].weightedCount += wt
+      if (mult >= 1.5) genreBudgetRaw[gbKey].wins += wt
     }
 
     if (at) {
-      if (!actorTierMap[at]) actorTierMap[at] = { count: 0, withGross: 0, avgMultiple: 0, winRatePct: 0, avgScore: 0, winners: 0 }
-      actorTierMap[at].count++
-      if (f.actor_rank_score !== null) actorTierMap[at].avgScore += f.actor_rank_score
+      if (!actorRaw[at]) actorRaw[at] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, scoreSum: 0 }
+      actorRaw[at].total += wt
+      actorRaw[at].weightedCount += wt
+      if (f.actor_rank_score !== null) actorRaw[at].scoreSum += f.actor_rank_score * wt
       if (mult !== null) {
-        actorTierMap[at].withGross++
-        actorTierMap[at].avgMultiple += mult
-        if (mult >= 1.5) actorTierMap[at].winners++
+        actorRaw[at].weightedMultSum += mult * wt
+        if (mult >= 1.5) actorRaw[at].wins += wt
       }
     }
 
     if (dt) {
-      if (!directorTierMap[dt]) directorTierMap[dt] = { count: 0, withGross: 0, avgMultiple: 0, winRatePct: 0, avgScore: 0, winners: 0 }
-      directorTierMap[dt].count++
-      if (f.director_rank_score !== null) directorTierMap[dt].avgScore += f.director_rank_score
+      if (!dirRaw[dt]) dirRaw[dt] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, scoreSum: 0 }
+      dirRaw[dt].total += wt
+      dirRaw[dt].weightedCount += wt
+      if (f.director_rank_score !== null) dirRaw[dt].scoreSum += f.director_rank_score * wt
       if (mult !== null) {
-        directorTierMap[dt].withGross++
-        directorTierMap[dt].avgMultiple += mult
-        if (mult >= 1.5) directorTierMap[dt].winners++
+        dirRaw[dt].weightedMultSum += mult * wt
+        if (mult >= 1.5) dirRaw[dt].wins += wt
       }
     }
 
-    if (at && dt) {
+    if (at && dt && mult !== null) {
       const key = `${dt}+${at}`
-      if (!comboMap[key]) comboMap[key] = { count: 0, withGross: 0, winners: 0, totalMult: 0 }
-      comboMap[key].count++
-      if (mult !== null) {
-        comboMap[key].withGross++
-        comboMap[key].totalMult += mult
-        if (mult >= 1.5) comboMap[key].winners++
-      }
+      if (!comboRaw[key]) comboRaw[key] = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0 }
+      comboRaw[key].total += wt
+      comboRaw[key].weightedMultSum += mult * wt
+      comboRaw[key].weightedCount += wt
+      if (mult >= 1.5) comboRaw[key].wins += wt
     }
   }
 
-  for (const g of Object.values(genreMap)) {
-    g.avgBudget = Math.round(g.avgBudget / g.count)
-    g.winRatePct = g.withGross > 0 ? Math.round((g.winners / g.withGross) * 100) : 0
-    g.avgMultiple = g.withGross > 0 ? Math.round((g.avgMultiple / g.withGross) * 100) / 100 : 0
+  const genreStats: Record<string, GenreStats> = {}
+  for (const [k, r] of Object.entries(genreRaw)) {
+    const rawWR = r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0
+    genreStats[k] = {
+      count: Math.round(r.weightedCount),
+      withGross: Math.round(r.weightedCount),
+      avgBudget: r.weightedCount > 0 ? Math.round(r.weightedBudget / r.weightedCount) : 0,
+      avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
+      winRatePct: rawWR,
+      adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+    }
   }
 
-  for (const t of Object.values(actorTierMap)) {
-    t.avgScore = t.avgScore > 0 ? Math.round((t.avgScore / t.count) * 100) / 100 : 0
-    t.winRatePct = t.withGross > 0 ? Math.round((t.winners / t.withGross) * 100) : 0
-    t.avgMultiple = t.withGross > 0 ? Math.round((t.avgMultiple / t.withGross) * 100) / 100 : 0
+  const actorTierStats: Record<string, TierStats> = {}
+  for (const [k, r] of Object.entries(actorRaw)) {
+    actorTierStats[k] = {
+      count: Math.round(r.weightedCount),
+      withGross: Math.round(r.weightedCount),
+      avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
+      winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
+      adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+      avgScore: r.weightedCount > 0 ? Math.round((r.scoreSum / r.weightedCount) * 100) / 100 : 0,
+    }
   }
 
-  for (const t of Object.values(directorTierMap)) {
-    t.avgScore = t.avgScore > 0 ? Math.round((t.avgScore / t.count) * 100) / 100 : 0
-    t.winRatePct = t.withGross > 0 ? Math.round((t.winners / t.withGross) * 100) : 0
-    t.avgMultiple = t.withGross > 0 ? Math.round((t.avgMultiple / t.withGross) * 100) / 100 : 0
+  const directorTierStats: Record<string, TierStats> = {}
+  for (const [k, r] of Object.entries(dirRaw)) {
+    directorTierStats[k] = {
+      count: Math.round(r.weightedCount),
+      withGross: Math.round(r.weightedCount),
+      avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
+      winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
+      adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+      avgScore: r.weightedCount > 0 ? Math.round((r.scoreSum / r.weightedCount) * 100) / 100 : 0,
+    }
   }
 
   const bandStats: Record<string, BudgetBandStats> = {}
-  for (const [band, data] of Object.entries(bandMap)) {
-    bandStats[band] = {
-      count: data.count,
-      winRatePct: data.withData > 0 ? Math.round((data.winners / data.withData) * 100) : 0,
-      avgMultiple: data.withData > 0 ? Math.round((data.avgMultiple / data.withData) * 100) / 100 : 0,
+  for (const [k, r] of Object.entries(bandRaw)) {
+    bandStats[k] = {
+      count: Math.round(r.weightedCount),
+      winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
+      adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+      avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
     }
   }
 
-  const sortedMultiples = [...allMultiples].sort((a, b) => a - b)
-  const len = sortedMultiples.length
+  const genreBudgetStats: Record<string, GenreBudgetInteraction> = {}
+  for (const [k, r] of Object.entries(genreBudgetRaw)) {
+    genreBudgetStats[k] = {
+      count: Math.round(r.weightedCount),
+      winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
+      adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+      avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
+    }
+  }
 
-  const getGenreBudgetWinRate = (films: BollywoodFilm[]): Record<string, number> => {
-    const result: Record<string, number> = {}
-    for (const g of Object.keys(genreMap)) {
-      const genreFilms = films.filter(f => f.primary_genre === g && f.gross_multiple !== null)
-      if (genreFilms.length >= 3) {
-        const winners = genreFilms.filter(f => f.gross_multiple! >= 1.5)
-        result[g] = Math.round((winners.length / genreFilms.length) * 100)
+  const comboStats: Record<string, { count: number; winRatePct: number; adjustedWinRatePct: number; avgMultiple: number }> = {}
+  for (const [k, r] of Object.entries(comboRaw)) {
+    if (r.weightedCount >= 2) {
+      comboStats[k] = {
+        count: Math.round(r.weightedCount),
+        winRatePct: r.weightedCount > 0 ? Math.round((r.wins / r.weightedCount) * 100) : 0,
+        adjustedWinRatePct: bayesianWR(Math.round(r.wins), Math.round(r.weightedCount)),
+        avgMultiple: r.weightedCount > 0 ? Math.round((r.weightedMultSum / r.weightedCount) * 100) / 100 : 0,
       }
     }
-    return result
   }
+
+  const sorted = [...allMultiples].sort((a, b) => a - b)
+  const len = sorted.length
 
   return {
-    genreStats: genreMap,
-    actorTierStats: actorTierMap,
-    directorTierStats: directorTierMap,
-    comboStats: Object.fromEntries(
-      Object.entries(comboMap)
-        .filter(([, v]) => v.count >= 3)
-        .map(([k, v]) => [k, {
-          count: v.count,
-          winRatePct: v.withGross > 0 ? Math.round((v.winners / v.withGross) * 100) : 0,
-          avgMultiple: v.withGross > 0 ? Math.round((v.totalMult / v.withGross) * 100) / 100 : 0,
-        }])
-    ),
+    genreStats,
+    actorTierStats,
+    directorTierStats,
+    comboStats,
     budgetBandStats: bandStats,
+    genreBudgetStats,
     grossMultiplePercentiles: {
-      p10: len > 0 ? sortedMultiples[Math.floor(len * 0.1)] : 0.17,
-      p25: len > 0 ? sortedMultiples[Math.floor(len * 0.25)] : 0.54,
-      p50: len > 0 ? sortedMultiples[Math.floor(len * 0.5)] : 1.50,
-      p75: len > 0 ? sortedMultiples[Math.floor(len * 0.75)] : 3.17,
-      p90: len > 0 ? sortedMultiples[Math.floor(len * 0.9)] : 5.29,
+      p10: sorted[Math.floor(len * 0.1)] ?? 0.17,
+      p25: sorted[Math.floor(len * 0.25)] ?? 0.54,
+      p50: sorted[Math.floor(len * 0.5)] ?? 1.50,
+      p75: sorted[Math.floor(len * 0.75)] ?? 3.17,
+      p90: sorted[Math.floor(len * 0.9)] ?? 5.29,
     },
-    genreBudgetAdjustedWinRates: getGenreBudgetWinRate(films),
   }
-}
-
-const CACHE: { films: BollywoodFilm[]; stats: DatasetStats } | null = null
-
-export function loadStats(films: BollywoodFilm[]): DatasetStats {
-  return computeDatasetStats(films)
 }

@@ -6,64 +6,62 @@ export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskD
 
   const band = budgetBand(input.totalBudgetCr)
   const bandData = stats.budgetBandStats[band]
-  const winRate = bandData ? bandData.winRatePct : 30
+  const bandAdjWR = bandData ? bandData.adjustedWinRatePct : 30
 
-  if (winRate < 20) {
+  if (bandAdjWR < 25) {
     factors.push({
       factor: 'High-Risk Budget Band',
       severity: 'high',
-      description: `₹${input.totalBudgetCr}Cr budget (${band} band) has only ${winRate}% historical success rate — majority of films at this budget level underperform`,
-      mitigation: 'Reduce budget to ₹30-60Cr range (37% success rate) or secure ≥60% pre-sale coverage before committing',
+      description: `₹${input.totalBudgetCr}Cr (${band} band): ~${bandAdjWR}% adjusted success rate — majority of films at this budget underperform`,
+      mitigation: 'Target ₹30-100Cr range for better historical outcomes, or secure ≥60% pre-sale coverage',
     })
-  } else if (winRate < 40) {
+  } else if (bandAdjWR < 45) {
     factors.push({
       factor: 'Below-Average Budget Band',
       severity: 'moderate',
-      description: `${band} band: ${winRate}% historical win rate — below the ₹60-100Cr+ band averages`,
-      mitigation: 'Consider increasing budget to the next band for better economics, or secure strong pre-sales',
+      description: `${band} band: ~${bandAdjWR}% adjusted WR — below ₹60Cr+ band averages`,
+      mitigation: 'Increase budget or secure strong pre-sales to compensate',
     })
   }
 
-  const genreData = stats.genreStats[input.primaryGenre]
-  if (genreData && genreData.withGross >= 5) {
-    const genreWR = Math.round(genreData.avgMultiple >= 1.5 ? 50 : 25)
-    if (genreWR < 30 && input.totalBudgetCr > 60) {
-      factors.push({
-        factor: 'Genre-Budget Mismatch',
-        severity: 'high',
-        description: `${input.primaryGenre} (avg budget ₹${genreData.avgBudget}Cr, avg ${genreData.avgMultiple}x) with ₹${input.totalBudgetCr}Cr budget — genre historically underperforms at this scale`,
-        mitigation: 'Reduce budget to align with genre benchmarks, or pivot genre positioning',
-      })
-    }
+  const gbKey = `${input.primaryGenre}|${band}`
+  const gbData = stats.genreBudgetStats[gbKey]
+  if (gbData && gbData.count >= 2 && gbData.adjustedWinRatePct < 35) {
+    factors.push({
+      factor: 'Genre-Budget Mismatch',
+      severity: 'high',
+      description: `${input.primaryGenre} + ${band} combo has ${gbData.adjustedWinRatePct}% adjusted WR (${gbData.count} films) — this specific genre-budget pairing historically struggles`,
+      mitigation: 'Adjust budget to a better-performing band for this genre, or strengthen pre-sale coverage',
+    })
   }
 
   const comboKey = `${input.directorTier}+${input.actorTier}`
   const comboData = stats.comboStats[comboKey]
-  if (comboData && comboData.winRatePct < 40) {
+  if (comboData && comboData.adjustedWinRatePct < 35) {
     factors.push({
       factor: 'Weak Talent Combination',
       severity: 'high',
-      description: `${input.directorTier}-tier director + ${input.actorTier}-tier actor combo has only ${comboData.winRatePct}% historical win rate (${comboData.count} films)`,
-      mitigation: 'Upgrade at least one talent tier to improve probability; consider A or B-tier lead for better pre-sale valuation',
+      description: `${input.directorTier}-tier director + ${input.actorTier}-tier actor: ${comboData.adjustedWinRatePct}% adjusted WR (${comboData.count} films)`,
+      mitigation: 'Upgrade at least one talent tier; A or B-tier lead improves pre-sale valuation',
     })
-  } else if (comboData && comboData.winRatePct >= 80) {
+  } else if (comboData && comboData.adjustedWinRatePct >= 80) {
     factors.push({
       factor: 'Strong Talent Track Record',
       severity: 'low',
-      description: `${input.directorTier}+${input.actorTier} combo shows ${comboData.winRatePct}% historical success — strong foundation`,
-      mitigation: 'Leverage combo for pre-sale negotiations; highlight in pitch deck',
+      description: `${input.directorTier}+${input.actorTier}: ${comboData.adjustedWinRatePct}% adjusted WR — proven combo`,
+      mitigation: 'Leverage combo in pre-sale negotiations and pitch deck',
     })
   }
 
-  if (!comboData && genreData && input.totalBudgetCr > 80) {
+  if (!comboData) {
     const actorData = stats.actorTierStats[input.actorTier]
     const dirData = stats.directorTierStats[input.directorTier]
-    if (actorData && actorData.winRatePct < 30 && input.totalBudgetCr > 80) {
+    if (actorData && actorData.adjustedWinRatePct < 35 && input.totalBudgetCr > 80) {
       factors.push({
         factor: 'Talent-Budget Gap',
         severity: 'moderate',
-        description: `₹${input.totalBudgetCr}Cr budget with ${input.actorTier}-tier lead (${actorData.winRatePct}% success rate) — high budget requires stronger talent pull`,
-        mitigation: 'Upgrade to A or B-tier lead, or reduce budget to ₹60Cr to align with talent tier',
+        description: `₹${input.totalBudgetCr}Cr budget with ${input.actorTier}-tier lead (~${actorData.adjustedWinRatePct}% adjusted WR)`,
+        mitigation: 'Upgrade lead or reduce budget to match talent tier',
       })
     }
   }
