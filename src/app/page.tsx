@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, BarChart3, ShieldCheck, TrendingUp, Film, Database, Star, ChevronDown } from 'lucide-react'
+import { ArrowRight, BarChart3, ShieldCheck, TrendingUp, Film, Database, Star, ChevronDown, Sparkles } from 'lucide-react'
 
 const stats = [
   { value: '700+', label: 'Films with verified financials' },
@@ -73,6 +73,7 @@ const faqs = [
   { q: 'How are pre-sale rights estimated?', a: 'Pre-sale data is user-provided, not from our dataset. The scoring engine benchmarks your inputs against market ranges per budget band (e.g., OTT typically runs 40–60% of budget for strong projects). The backtest estimates pre-sale from budget when actual data is absent.' },
   { q: 'What is the continuous outcome model?', a: 'Unlike binary models that predict win/loss, our continuous model scores each component by expected gross multiple — the average box office return relative to budget. Components are capped at a multiple of 3.5–4.0 and mapped to a 1–10 score. This catches partial successes that binary models miss, improving recall from 22% to 52%.' },
   { q: 'Who is this built for — producers or financiers?', a: 'Both. The producer view emphasizes greenlight viability, genre compatibility, and comparable films. The financier view weights capital recovery, risk diagnosis, and downside scenarios. Each role gets a tailored scorecard from the same underlying model, just with different component weights.' },
+  { q: 'How do you handle survivorship bias?', a: 'Only ~30% of Bollywood films report financial data — the ones that do tend to be more successful (dataset average multiple 2.72x vs real market ~1.0x). Our walk-forward backtest adjusts for this by using break-even-anchored normalization: every component score is computed relative to the break-even multiple within its category, not absolute returns. The methodology footnote in every report discloses the bias and its impact on interpretability.' },
 ]
 
 export default function Home() {
@@ -83,12 +84,13 @@ export default function Home() {
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(16,185,129,0.12),transparent_60%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_80%,rgba(6,182,212,0.08),transparent_60%)]" />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
-        <div className="absolute -bottom-40 -right-40 size-[500px] rounded-full bg-emerald-500/10 blur-3xl" />
-        <div className="absolute -top-40 -left-40 size-[400px] rounded-full bg-cyan-500/5 blur-3xl" />
+        <div className="absolute -bottom-40 -right-40 size-[500px] rounded-full bg-emerald-500/10 blur-3xl animate-float" />
+        <div className="absolute -top-40 -left-40 size-[400px] rounded-full bg-cyan-500/5 blur-3xl animate-float" style={{ animationDelay: '-3s' }} />
 
         <div className="relative mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 text-center">
           <Badge variant="outline" className="border-white/10 text-xs text-white/60">
-            Bollywood Investment Intelligence
+            <Sparkles className="size-3 mr-1" />
+            Film Investment Intelligence
           </Badge>
           <h1 className="text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
             Make data-driven
@@ -108,11 +110,7 @@ export default function Home() {
                 <ArrowRight className="ml-1 size-4" />
               </Button>
             </Link>
-            <Link href="/dashboard">
-              <Button variant="outline" size="lg" className="rounded-full border-white/20 px-8 text-base text-white hover:bg-white/10">
-                Explore Dataset
-              </Button>
-            </Link>
+
           </div>
         </div>
       </section>
@@ -142,7 +140,7 @@ export default function Home() {
           </div>
 
           <div className="scrollbar-hide -mx-6 flex snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-4">
-            {features.map((f, i) => (
+            {features.map(f => (
               <div
                 key={f.title}
                 className={`bg-gradient-to-br ${f.gradient} ${f.border} flex w-[280px] shrink-0 snap-start flex-col gap-4 rounded-2xl border p-6 sm:w-[320px]`}
@@ -159,8 +157,8 @@ export default function Home() {
           </div>
 
           <div className="mt-6 flex items-center justify-center gap-2">
-            {features.map((_, i) => (
-              <div key={i} className={`size-1.5 rounded-full ${i === 0 ? 'bg-white/60' : 'bg-white/20'}`} />
+            {features.map((_, idx) => (
+              <div key={idx} className={`size-1.5 rounded-full ${idx === 0 ? 'bg-white/60' : 'bg-white/20'}`} />
             ))}
           </div>
         </div>
@@ -324,8 +322,8 @@ export default function Home() {
           <div className="flex animate-marquee-left gap-4" style={{ width: 'max-content' }}>
             {[...testimonials, ...testimonials].map((t, i) => (
               <div
-                key={i}
-                className="w-[340px] shrink-0 rounded-xl border border-white/5 bg-zinc-900/50 p-5"
+                key={`${t.name}-${i}`}
+                className="w-[280px] sm:w-[340px] max-w-[85vw] shrink-0 rounded-xl border border-white/5 bg-zinc-900/50 p-5"
               >
                 <div className="mb-2 flex gap-0.5">
                   {[...Array(5)].map((_, j) => (
@@ -335,7 +333,7 @@ export default function Home() {
                 <p className="text-sm leading-relaxed text-white/70">&ldquo;{t.quote}&rdquo;</p>
                 <div className="mt-3 flex items-center gap-2">
                   <div className="flex size-7 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
-                    {t.name.split(' ').map(n => n[0]).join('')}
+                    {t.name.split(' ').map(n => n.charAt(0)).join('')}
                   </div>
                   <div>
                     <p className="text-xs font-medium text-white">{t.name}</p>
@@ -349,8 +347,8 @@ export default function Home() {
           <div className="flex animate-marquee-right gap-4" style={{ width: 'max-content' }}>
             {[...testimonials, ...testimonials].map((t, i) => (
               <div
-                key={i}
-                className="w-[340px] shrink-0 rounded-xl border border-white/5 bg-zinc-900/50 p-5"
+                key={`${t.name}-r-${i}`}
+                className="w-[280px] sm:w-[340px] max-w-[85vw] shrink-0 rounded-xl border border-white/5 bg-zinc-900/50 p-5"
               >
                 <div className="mb-2 flex gap-0.5">
                   {[...Array(5)].map((_, j) => (
@@ -360,7 +358,7 @@ export default function Home() {
                 <p className="text-sm leading-relaxed text-white/70">&ldquo;{t.quote}&rdquo;</p>
                 <div className="mt-3 flex items-center gap-2">
                   <div className="flex size-7 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
-                    {t.name.split(' ').map(n => n[0]).join('')}
+                    {t.name.split(' ').map(n => n.charAt(0)).join('')}
                   </div>
                   <div>
                     <p className="text-xs font-medium text-white">{t.name}</p>
@@ -401,7 +399,7 @@ export default function Home() {
 
       {/* ───────── CTA ───────── */}
       <section className="relative overflow-hidden bg-black py-20 sm:py-28">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_50%,rgba(16,185,129,0.08),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_50%,rgba(16,185,129,0.08),transparent_60%)] animate-float" style={{ animationDelay: '-1s' }} />
         <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
 
         <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-6 px-6 text-center">
@@ -428,30 +426,28 @@ export default function Home() {
           <div>
             <p className="mb-3 text-sm font-semibold text-white">Model</p>
             <div className="flex flex-col gap-1.5 text-sm text-white/40">
-              <Link href="/evaluate" className="hover:text-white/70 transition-colors">Evaluate</Link>
-              <Link href="/dashboard" className="hover:text-white/70 transition-colors">Dashboard</Link>
-              <span>v2.0 — Continuous Model</span>
+              <span>Continuous Outcome Model</span>
+              <span>Walk-Forward Validated</span>
             </div>
           </div>
           <div>
             <p className="mb-3 text-sm font-semibold text-white">Company</p>
             <div className="flex flex-col gap-1.5 text-sm text-white/40">
-              <span>Bollywood Investment Research</span>
+              <span>Greenlit</span>
               <span>Bengaluru, India</span>
-              <span>contact@filmrisk.in</span>
+              <a href="mailto:contact@filmrisk.in" className="hover:text-white/70 transition-colors">contact@filmrisk.in</a>
             </div>
           </div>
           <div>
-            <p className="mb-3 text-sm font-semibold text-white">Connect</p>
+            <p className="mb-3 text-sm font-semibold text-white">Resource</p>
             <div className="flex flex-col gap-1.5 text-sm text-white/40">
-              <span>Documentation</span>
-              <span>GitHub</span>
-              <span>@filmrisk</span>
+              <Link href="/evaluate" className="hover:text-white/70 transition-colors">Evaluate a Project</Link>
+              <span>v2.0 — Continuous Model</span>
             </div>
           </div>
         </div>
         <div className="border-t border-white/5 px-6 py-4 text-center text-xs text-white/30">
-          FilmRisk Bollywood &middot; 2026
+          Greenlit &middot; 2026
         </div>
       </footer>
     </div>

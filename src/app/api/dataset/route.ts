@@ -8,7 +8,7 @@ let cachedSummary: ReturnType<typeof computeDatasetSummary> | null = null
 
 function loadFilms() {
   if (cachedFilms) return cachedFilms
-  const filePath = path.join(process.cwd(), 'src', 'data', 'bollywood_master_v0.csv')
+  const filePath = path.join(process.cwd(), 'src', 'data', 'bollywood_input.csv')
   const text = fs.readFileSync(filePath, 'utf-8')
   cachedFilms = parseCSV(text)
   return cachedFilms
@@ -21,7 +21,7 @@ export async function GET() {
       cachedSummary = computeDatasetSummary(films)
     }
     return NextResponse.json({ summary: cachedSummary, count: films.length })
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'Failed to load dataset' }, { status: 500 })
   }
 }

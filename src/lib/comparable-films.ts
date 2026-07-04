@@ -1,4 +1,4 @@
-import type { BollywoodFilm, ComparableFilm, ComparableResult, EvaluationInput } from './types'
+import type { BollywoodFilm, ComparableResult, EvaluationInput } from './types'
 import type { DatasetStats } from './dataset-stats'
 
 const WEIGHTS = {
@@ -19,7 +19,6 @@ export function findComparableFilms(
   stats: DatasetStats,
   topN: number = 10
 ): ComparableResult {
-  const targetBand = budgetBand(input.totalBudgetCr)
   const scored: { film: BollywoodFilm; details: Record<string, number>; total: number }[] = []
 
   for (const film of films) {
@@ -105,7 +104,8 @@ function budgetSimilarity(a: number, b: number): number {
   return Math.min(a, b) / Math.max(a, b)
 }
 
-function yearRecency(year: number): number {
+function yearRecency(year: number | null): number {
+  if (year === null) return 0.3
   const diff = Math.abs(2025 - year)
   if (diff <= 2) return 1
   if (diff <= 5) return 0.8
@@ -123,11 +123,4 @@ function dirScoreSimilarity(input: EvaluationInput, film: BollywoodFilm): number
   return input.director.toLowerCase() === film.director?.toLowerCase() ? 1 : 0
 }
 
-function budgetBand(b: number): string {
-  if (b < 10) return '<10'
-  if (b < 30) return '10-30'
-  if (b < 60) return '30-60'
-  if (b < 100) return '60-100'
-  if (b < 200) return '100-200'
-  return '>200'
-}
+

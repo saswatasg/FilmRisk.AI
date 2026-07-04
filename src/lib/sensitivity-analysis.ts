@@ -14,8 +14,6 @@ const FIELDS: { label: string; field: keyof EvaluationInput; type: 'tier' | 'sli
 ]
 
 const TIER_ORDER: Record<string, number> = { A: 4, B: 3, C: 2, D: 1, unknown: 0 }
-const MONTH_ORDER: Record<number, number[]> = {}
-const MONTH_SCORE: Record<number, number> = {}
 
 function tierUp(t: string): string | null {
   const cur = TIER_ORDER[t] ?? 0
@@ -29,9 +27,9 @@ function monthUp(m: number, stats: DatasetStats): string | null {
   if (!cur || cur.count < 3) return null
   const best = Object.entries(stats.monthStats)
     .filter(([, v]) => v.count >= 3)
-    .sort(([, a], [, b]) => b.adjustedWinRatePct - a.adjustedWinRatePct)
+    .sort(([, a], [, b]) => b.avgNormalizedMultiple - a.avgNormalizedMultiple)
   if (best.length === 0) return null
-  const bestMonth = parseInt(best[0][0])
+  const bestMonth = parseInt(best[0]![0])
   if (bestMonth === m) return null
   return MONTHS[bestMonth] ?? null
 }
@@ -99,7 +97,7 @@ export function analyzeSensitivities(input: EvaluationInput, stats: DatasetStats
 
     if (!suggested) continue
 
-    const testInput = { ...input, [f.field]: f.type === 'budget' ? input.ottRightsCr + (input.totalBudgetCr * 0.15) : suggested as any }
+    const testInput = { ...input, [f.field]: f.type === 'budget' ? input.ottRightsCr + (input.totalBudgetCr * 0.15) : suggested }
     const modified = calculateGreenlightScore(testInput, stats)
     const gain = Math.round((modified.totalScore - base.totalScore) * 10) / 10
 

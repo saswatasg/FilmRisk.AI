@@ -1,54 +1,55 @@
 import type { EvaluationInput, RiskDiagnosis, RiskFactor } from './types'
 import type { DatasetStats } from './dataset-stats'
+import { budgetBand } from './industry-constants'
 
 export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskDiagnosis {
   const factors: RiskFactor[] = []
 
   const band = budgetBand(input.totalBudgetCr)
   const bandData = stats.budgetBandStats[band]
-  const bandAdjWR = bandData ? bandData.adjustedWinRatePct : 30
+  const bandNormMult = bandData ? bandData.avgNormalizedMultiple : 0.5
 
-  if (bandAdjWR < 25) {
+  if (bandNormMult < 0.6) {
     factors.push({
       factor: 'High-Risk Budget Band',
       severity: 'high',
-      description: `₹${input.totalBudgetCr}Cr (${band} band): ~${bandAdjWR}% adjusted success rate — majority of films at this budget underperform`,
+      description: `₹${input.totalBudgetCr}Cr (${band} band): ~${(bandNormMult * 100).toFixed(0)}% of break-even — majority of films at this budget underperform`,
       mitigation: 'Target ₹30-100Cr range for better historical outcomes, or secure ≥60% pre-sale coverage',
     })
-  } else if (bandAdjWR < 45) {
+  } else if (bandNormMult < 0.85) {
     factors.push({
       factor: 'Below-Average Budget Band',
       severity: 'moderate',
-      description: `${band} band: ~${bandAdjWR}% adjusted WR — below ₹60Cr+ band averages`,
+      description: `${band} band: ~${(bandNormMult * 100).toFixed(0)}% break-even avg — below ₹60Cr+ band averages`,
       mitigation: 'Increase budget or secure strong pre-sales to compensate',
     })
   }
 
   const gbKey = `${input.primaryGenre}|${band}`
   const gbData = stats.genreBudgetStats[gbKey]
-  if (gbData && gbData.count >= 2 && gbData.adjustedWinRatePct < 35) {
+  if (gbData && gbData.count >= 2 && gbData.avgNormalizedMultiple < 0.85) {
     factors.push({
       factor: 'Genre-Budget Mismatch',
       severity: 'high',
-      description: `${input.primaryGenre} + ${band} combo has ${gbData.adjustedWinRatePct}% adjusted WR (${gbData.count} films) — this specific genre-budget pairing historically struggles`,
+      description: `${input.primaryGenre} + ${band} combo has ${(gbData.avgNormalizedMultiple * 100).toFixed(0)}% break-even avg (${gbData.count} films) — this specific genre-budget pairing historically struggles`,
       mitigation: 'Adjust budget to a better-performing band for this genre, or strengthen pre-sale coverage',
     })
   }
 
   const comboKey = `${input.directorTier}+${input.actorTier}`
   const comboData = stats.comboStats[comboKey]
-  if (comboData && comboData.adjustedWinRatePct < 35) {
+  if (comboData && comboData.avgNormalizedMultiple < 0.85) {
     factors.push({
       factor: 'Weak Talent Combination',
       severity: 'high',
-      description: `${input.directorTier}-tier director + ${input.actorTier}-tier actor: ${comboData.adjustedWinRatePct}% adjusted WR (${comboData.count} films)`,
+      description: `${input.directorTier}-tier director + ${input.actorTier}-tier actor: ${(comboData.avgNormalizedMultiple * 100).toFixed(0)}% break-even avg (${comboData.count} films)`,
       mitigation: 'Upgrade at least one talent tier; A or B-tier lead improves pre-sale valuation',
     })
-  } else if (comboData && comboData.adjustedWinRatePct >= 80) {
+  } else if (comboData && comboData.avgNormalizedMultiple >= 1.5) {
     factors.push({
       factor: 'Strong Talent Track Record',
       severity: 'low',
-      description: `${input.directorTier}+${input.actorTier}: ${comboData.adjustedWinRatePct}% adjusted WR — proven combo`,
+      description: `${input.directorTier}+${input.actorTier}: ${(comboData.avgNormalizedMultiple * 100).toFixed(0)}% break-even avg — proven combo`,
       mitigation: 'Leverage combo in pre-sale negotiations and pitch deck',
     })
   }
@@ -56,19 +57,19 @@ export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskD
   if (!comboData) {
     const actorData = stats.actorTierStats[input.actorTier]
     const dirData = stats.directorTierStats[input.directorTier]
-    if (actorData && actorData.adjustedWinRatePct < 35 && input.totalBudgetCr > 80) {
+    if (actorData && actorData.avgNormalizedMultiple < 0.85 && input.totalBudgetCr > 80) {
       factors.push({
         factor: 'Talent-Budget Gap',
         severity: 'moderate',
-        description: `₹${input.totalBudgetCr}Cr budget with ${input.actorTier}-tier lead (~${actorData.adjustedWinRatePct}% adjusted WR)`,
+        description: `₹${input.totalBudgetCr}Cr budget with ${input.actorTier}-tier lead (~${(actorData.avgNormalizedMultiple * 100).toFixed(0)}% break-even avg)`,
         mitigation: 'Upgrade lead or reduce budget to match talent tier',
       })
     }
-    if (dirData && dirData.adjustedWinRatePct < 35 && input.totalBudgetCr > 80) {
+    if (dirData && dirData.avgNormalizedMultiple < 0.85 && input.totalBudgetCr > 80) {
       factors.push({
         factor: 'Director-Budget Gap',
         severity: 'moderate',
-        description: `₹${input.totalBudgetCr}Cr budget with ${input.directorTier}-tier director (~${dirData.adjustedWinRatePct}% adjusted WR)`,
+        description: `₹${input.totalBudgetCr}Cr budget with ${input.directorTier}-tier director (~${(dirData.avgNormalizedMultiple * 100).toFixed(0)}% break-even avg)`,
         mitigation: 'Upgrade director or reduce budget to match director tier',
       })
     }
@@ -99,11 +100,11 @@ export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskD
   }
 
   const ms = stats.monthStats[input.releaseMonth]
-  if (ms && ms.count >= 3 && ms.adjustedWinRatePct < 40) {
+  if (ms && ms.count >= 3 && ms.avgNormalizedMultiple < 0.9) {
     factors.push({
       factor: 'Weak Release Month',
       severity: 'moderate',
-      description: `${monthName(input.releaseMonth)}: ${ms.adjustedWinRatePct}% adjusted WR (${ms.count} films) — historically underperforms`,
+      description: `${monthName(input.releaseMonth)}: ${(ms.avgNormalizedMultiple * 100).toFixed(0)}% break-even avg (${ms.count} films) — historically underperforms`,
       mitigation: 'Move release to a stronger month (e.g., Diwali, Eid, or Christmas window)',
     })
   }
@@ -149,8 +150,8 @@ export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskD
   }
 
   const severityScore: Record<string, number> = { critical: 4, high: 3, moderate: 2, low: 1 }
-  const totalSeverity = factors.reduce((s, f) => s + severityScore[f.severity], 0)
-  const maxSeverity = Math.max(...factors.map(f => severityScore[f.severity]), 0)
+  const totalSeverity = factors.reduce((s, f) => s + severityScore[f.severity]!, 0)
+  const maxSeverity = Math.max(...factors.map(f => severityScore[f.severity]!), 0)
 
   const overallRisk = maxSeverity >= 4 ? 'very_high' : totalSeverity >= 8 ? 'high' : totalSeverity >= 3 ? 'moderate' : 'low'
 
@@ -176,13 +177,4 @@ export function diagnoseRisk(input: EvaluationInput, stats: DatasetStats): RiskD
 function monthName(m: number): string {
   const names = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
   return names[m] ?? `Month ${m}`
-}
-
-function budgetBand(b: number): string {
-  if (b < 10) return '<10'
-  if (b < 30) return '10-30'
-  if (b < 60) return '30-60'
-  if (b < 100) return '60-100'
-  if (b < 200) return '100-200'
-  return '>200'
 }

@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
+import { Clapperboard } from "lucide-react";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -18,8 +20,8 @@ const playfairDisplay = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "FilmRisk Bollywood",
-  description: "Film investment intelligence platform for Bollywood producers and financiers",
+  title: "Greenlit",
+  description: "Film investment intelligence platform for producers and financiers",
 };
 
 export default function RootLayout({
@@ -32,13 +34,22 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${playfairDisplay.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        <header className="border-b">
-          <div className="mx-auto flex h-12 max-w-5xl items-center gap-6 px-4">
-            <a href="/" className="font-semibold tracking-tight">FilmRisk</a>
-            <nav className="flex items-center gap-4 text-sm text-muted-foreground">
-              <a href="/evaluate" className="hover:text-foreground transition-colors">Evaluate</a>
-              <a href="/dashboard" className="hover:text-foreground transition-colors">Dashboard</a>
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+        <header className="sticky top-0 z-50 border-b border-white/5 bg-zinc-950/80 backdrop-blur-md">
+          <div className="mx-auto flex h-14 max-w-5xl items-center gap-6 px-4">
+            <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-white">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-emerald-500/10">
+                <Clapperboard className="size-4 text-emerald-400" />
+              </span>
+              <span className="font-serif-accent">Green</span>lit
+            </Link>
+            <nav className="flex items-center gap-6 text-sm">
+              <Link
+                href="/evaluate"
+                className="text-white/50 transition-all duration-200 hover:text-emerald-400 hover:drop-shadow-[0_0_6px_rgba(52,211,153,0.5)]"
+              >
+                Evaluate
+              </Link>
             </nav>
           </div>
         </header>

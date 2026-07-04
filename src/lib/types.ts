@@ -1,10 +1,11 @@
 export interface BollywoodFilm {
   film_id: string
-  canonical_title: string
   display_title: string
-  release_year: number
+  release_year: number | null
   release_month_num: number | null
   primary_genre: string
+  secondary_genre: string
+  sequel_flag: boolean
   director: string
   lead_actor_1: string
   lead_actor_2: string
@@ -17,17 +18,15 @@ export interface BollywoodFilm {
   worldwide_gross_cr: number | null
   gross_multiple: number | null
   verdict_raw: string
-  hitflop_numeric: number | null
-  imdb_rating: number | null
-  imdb_votes: number | null
-  runtime_min: number | null
-  model_usage: string
   financial_data_confidence: string
+  is_imputed_finance?: boolean
 }
 
 export interface EvaluationInput {
   filmTitle: string
   primaryGenre: string
+  secondaryGenre: string
+  sequelFlag: boolean
   logline: string
   conceptClarity: number
   novelty: number
@@ -60,14 +59,22 @@ export interface ScoreComponent {
   explanation: string
   sampleSize?: number
   trajectory?: 'up' | 'down' | 'stable' | null
+  scoreRange?: { min: number; max: number }
+  rankPct?: number
 }
 
 export interface GreenlightScoreResult {
   totalScore: number
+  adjustedScore: number
+  evidenceScore: number
+  inputScore: number
+  evidencePct: number
+  realMarketPct: number
   verdict: 'greenlight' | 'conditional' | 'dont_invest'
   components: ScoreComponent[]
   confidence: 'high' | 'medium' | 'low'
   confidenceInterval: { lower: number; upper: number }
+  narrativeSummary: string
 }
 
 export interface FinancierRiskResult {
@@ -98,8 +105,22 @@ export interface ROIScenario {
   roiPercent: number
 }
 
+export interface MonteCarloResult {
+  simulations: number
+  p10: ROIScenario
+  p25: ROIScenario
+  p50: ROIScenario
+  p75: ROIScenario
+  p90: ROIScenario
+  probProfit: number
+  expectedReturn: number
+  expectedMultiple: number
+  downsideRisk: number
+}
+
 export interface FinancialProjection {
   scenarios: ROIScenario[]
+  monteCarlo: MonteCarloResult
   breakEvenGrossCr: number
   safeBudgetRange: { min: number; max: number }
 }
@@ -135,6 +156,21 @@ export interface PreSaleBenchmark {
   tip?: string
 }
 
+export interface MarketSignal {
+  category: 'economic' | 'political' | 'social_trend' | 'industry'
+  headline: string
+  sentiment: 'positive' | 'negative' | 'neutral'
+  impact: number
+  affectedGenres?: string[]
+}
+
+export interface MarketSignalReport {
+  signals: MarketSignal[]
+  compositeScore: number
+  source: 'live' | 'mock'
+  timestamp: string
+}
+
 export interface EvaluationResult {
   projectSummary: {
     title: string
@@ -152,6 +188,7 @@ export interface EvaluationResult {
   preSaleBenchmarks: PreSaleBenchmark[]
   validationErrors: string[]
   dataQualityWarnings: string[]
+  marketSignals: MarketSignalReport | null
   timestamp: string
 }
 

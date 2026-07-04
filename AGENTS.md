@@ -5,40 +5,46 @@ This version has breaking changes — APIs, conventions, and file structure may 
 <!-- END:nextjs-agent-rules -->
 
 <!-- BEGIN:backtest-results -->
-# Honest Backtest Results
+# Honest Evaluation Results (June 2026)
 
-## Methodological changes from earlier versions
-- **Time-series split**: Train ≤ 2022, test > 2022 (not in-sample)
-- **Bayesian shrinkage**: Uses actual (unweighted) counts — NOT temporally-inflated counts
-- **Seasonality**: 3% weight added, scored from release_month_num stats
-- **Pre-sale caveat**: 22% weight component is estimated from budget bands (CSV has no pre-sale data)
+## Primary Benchmark: Walk-Forward (Forward-Chaining)
+Train ≤ Y, test Y+1, rolling 12 folds (2014–2025). Full scoring engine (ML blend + Bayesian + 10 components). **619 films tested.** This is the headline metric.
 
-## Out-of-Sample Performance (2023-2025, n=30)
-| Metric | Win-rate model (old) | Continuous model (current) |
-|--------|---------------------|---------------------------|
-| Greenlight Precision | 85.7% | **93.3%** |
-| Greenlight Recall | 22.2% | **51.9%** |
-| False Positive Rate | 14.3% | **6.7%** |
-| Greenlight Predicted | 7/30 | **15/30** |
-| Don't Invest Pred | 0% | **0%** |
-| Overall Accuracy | 36.7% | **43.3%** |
+| Metric | Value [95% CI] |
+|--------|---------------|
+| Accuracy | 47.2% [43.3%, 51.1%] |
+| Greenlight Precision | 29.8% [23.5%, 37.1%] |
+| Greenlight Recall | 44.0% |
+| F1 Score | 35.5% |
+| Greenlight Calls | 171/619 (27.6%) |
+| Always-Flop Baseline | 67.2% |
+
+## Secondary: 75-25 Random Split (In-Distribution Upper Bound)
+Reference only — future films leak into training.
+
+| Metric | Value [95% CI] |
+|--------|---------------|
+| Accuracy | 53.5% [46.0%, 60.9%] |
+| Greenlight Precision | 44.2% [31.6%, 57.7%] |
+| Greenlight Recall | 69.7% |
+| F1 Score | 54.1% |
+| Greenlight Calls | 52/170 (30.6%) |
+| Always-Flop Baseline | 50.0% |
 
 ## Key Takeaways
-- 93.3% precision with 51.9% recall — model catches ~half of successes with very few false positives
-- Switched to continuous outcome model (expected gross multiple, not binary win rate) in May 2026
-- Many BLOCKBUSTER films still edge below 75 threshold (e.g. Pathaan 74.4) — thresholds may need 2-3pt adjustment
-- 0 Don't Invest calls suggests adding lower boundary for true negative predictions
-- 10 components now (added Production House at 4% weight)
-- Small test set (n=30) limits statistical confidence — primary benchmark is OOS precision
+- Walk-forward accuracy 47.2% vs always-flop 67.2% — model adds value but is still below the naive baseline. Precision of 29.8% is 1.6× better than random 18.7% hit rate.
+- Imputed rows (105) excluded from training — training on band-median targets inflated 75-25 metrics from 53.5% → 67.9% in earlier versions.
+- Era-aware break-even (pre_ott/ott_growth/covid/mature) lowers normalized multiples for pre-2015 films (no OTT rights), shifting their percentile rankings.
+- 9-dim feature vector (no genre OHE, no production_house in GBM) — sparse one-hot features removed.
+- Log-space GBM target tried (Task 9) and reverted — didn't improve headliner metrics (acc dropped 39.4% → 30.2%).
+- Thresholds kept at offset +1 from base (current PCT_THRESHOLDS). Walk-forward sweep shows offset -11 has best F1 (44.9%) but is too aggressive (46% GL calls). Offset +1 prioritizes precision over recall.
 
-## Walk-Forward Validation (15 rolling windows, 2010-2025)
-| Metric | Value |
-|--------|-------|
-| Avg Accuracy | **18.4%** |
-| Windows | 15 |
-| Range | 0%–43.8% |
-
-Walk-forward is a relative diagnostic only — tiny per-year test sets (8-23 films) and bucketed verdicts make absolute accuracy noisy. Focus on OOS metrics above.
+## Known Limitations
+- 67.2% always-flop baseline means any non-trivial GL calls reduce accuracy. The model deliberately calls GL on uncertain films, which hurts accuracy but is higher value (catches hits).
+- Forward-chaining trains on ≤Y data, which can be thin for early years (2010–2013 excluded, <50 films). 2015 has n=76 with 8.8% GL precision — early folds are noisy.
+- Walk-forward accuracy of 47.2% suggests the scoring engine's percentile ranking is reasonable but thresholds need calibration for production use.
+- 171 GL calls across 619 films (27.6%) is aggressive. Each GL false positive is a potential investment loss. Consider stricter thresholds for real use.
+- No log-space GBM (didn't improve metrics).
 <!-- END:backtest-results -->
 
 <!-- BEGIN:filmrisk-research -->

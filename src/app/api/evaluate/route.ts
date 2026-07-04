@@ -8,6 +8,7 @@ import { diagnoseRisk } from '@/lib/risk-diagnosis'
 import { analyzeSensitivities } from '@/lib/sensitivity-analysis'
 import { computePreSaleBenchmarks } from '@/lib/pre-sale-benchmark'
 import { validateInputBackend, getDataQualityWarnings } from '@/lib/validate-input'
+import { fetchMarketSignals } from '@/lib/market-signals'
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,14 +21,16 @@ export async function POST(request: NextRequest) {
 
     const { films, stats } = loadDataset()
 
-    const greenlight = calculateGreenlightScore(input, stats)
-    const financierRisk = calculateFinancierRisk(input, stats)
+    const marketSignals = await fetchMarketSignals()
+
+    const greenlight = calculateGreenlightScore(input, stats, marketSignals)
+    const financierRisk = calculateFinancierRisk(input, stats, marketSignals)
     const comparableFilms = findComparableFilms(input, films, stats, 8)
-    const financialProjection = calculateFinancialProjection(input, stats)
+    const financialProjection = calculateFinancialProjection(input, stats, greenlight.adjustedScore)
     const riskDiagnosis = diagnoseRisk(input, stats)
     const sensitivities = analyzeSensitivities(input, stats)
     const preSaleBenchmarks = computePreSaleBenchmarks(input)
-    const dataQualityWarnings = getDataQualityWarnings(input)
+    const dataQualityWarnings = getDataQualityWarnings(input, stats)
 
     const result: EvaluationResult = {
       projectSummary: {
@@ -46,6 +49,7 @@ export async function POST(request: NextRequest) {
       preSaleBenchmarks,
       validationErrors,
       dataQualityWarnings,
+      marketSignals,
       timestamp: new Date().toISOString(),
     }
 
