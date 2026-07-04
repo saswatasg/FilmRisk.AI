@@ -188,7 +188,7 @@ for (let offset = -15; offset <= 20; offset += 1) {
   let glCalls = 0, glHits = 0, allHits = 0
 
   for (const r of allFilmRecords) {
-    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']
+    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']!
     const glThresh = Math.max(1, Math.min(99, base.gl + offset))
     const condThresh = Math.max(1, Math.min(99, base.cond + offset))
 
@@ -242,20 +242,21 @@ if (bestAcc) {
     DONT_INVEST: { HIT: 0, BLOCKBUSTER: 0, BREAK_EVEN: 0, BELOW_AVG: 0, FLOP: 0 },
   }
   for (const r of allFilmRecords) {
-    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']
+    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']!
     const glThresh = Math.max(1, Math.min(99, base.gl + opt))
     const condThresh = Math.max(1, Math.min(99, base.cond + opt))
     let verdict: string
     if (r.realMarketPct >= glThresh) verdict = 'GREENLIGHT'
     else if (r.realMarketPct >= condThresh) verdict = 'CONDITIONAL'
     else verdict = 'DONT_INVEST'
-    conf[verdict][r.actual] = (conf[verdict][r.actual] ?? 0) + 1
+    const row = conf[verdict]!
+    row[r.actual] = (row[r.actual] ?? 0) + 1
   }
   console.log('\nConfusion at best-F1 offset:')
   console.log('               | BLOCKBUSTER | HIT | BREAK_EVEN | BELOW_AVG | FLOP')
-  console.log('  GREENLIGHT   |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(conf.GREENLIGHT[k] ?? 0).padStart(10)}`).join(' |'))
-  console.log('  CONDITIONAL  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(conf.CONDITIONAL[k] ?? 0).padStart(10)}`).join(' |'))
-  console.log('  DONT_INVEST  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(conf.DONT_INVEST[k] ?? 0).padStart(10)}`).join(' |'))
+  console.log('  GREENLIGHT   |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(conf.GREENLIGHT![k] ?? 0).padStart(10)}`).join(' |'))
+  console.log('  CONDITIONAL  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(conf.CONDITIONAL![k] ?? 0).padStart(10)}`).join(' |'))
+  console.log('  DONT_INVEST  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(conf.DONT_INVEST![k] ?? 0).padStart(10)}`).join(' |'))
 }
 
 /* ───── Walk-forward detail ───── */

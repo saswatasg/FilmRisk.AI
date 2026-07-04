@@ -66,7 +66,7 @@ export function EvaluationResults({ result, className }: { result: EvaluationRes
       `Greenlit — ${result.projectSummary.title}`,
       `Score: ${g.adjustedScore ?? '--'}/100 | Verdict: ${vc.label}`,
       `Evidence: ${g.evidenceScore ?? '--'}/100 | Rank: P${g.realMarketPct ?? '--'}`,
-      `Budget: \u20B9${result.projectSummary.totalBudgetCr}Cr | Profit prob: ${mc.probProfit}%`,
+      `Budget: ₹${result.projectSummary.totalBudgetCr}Cr | Profit prob: ${mc.probProfit}%`,
       result.riskDiagnosis.topRecommendations[0]
         ? `Top recommendation: ${result.riskDiagnosis.topRecommendations[0] ?? ''}`
         : '',
@@ -223,10 +223,10 @@ export function EvaluationResults({ result, className }: { result: EvaluationRes
                 <span className="text-[10px] font-medium text-white/50">{label}</span>
                 <span className="text-[9px] text-white/30">{s.multiple}x</span>
               </div>
-              <p className="mt-1 text-base font-semibold text-white">\u20B9{s.grossCr}Cr</p>
+              <p className="mt-1 text-base font-semibold text-white">₹{s.grossCr}Cr</p>
               <div className="mt-1 flex justify-between text-[10px]">
                 <span className={s.netProfitCr >= 0 ? 'text-emerald-400' : 'text-red-400'}>
-                  {s.netProfitCr >= 0 ? '+' : ''}\u20B9{s.netProfitCr}Cr
+                  {s.netProfitCr >= 0 ? '+' : ''}₹{s.netProfitCr}Cr
                 </span>
                 <span className={s.netProfitCr >= 0 ? 'text-emerald-400' : 'text-red-400'}>
                   {s.roiPercent >= 0 ? '+' : ''}{s.roiPercent}%
@@ -243,7 +243,7 @@ export function EvaluationResults({ result, className }: { result: EvaluationRes
           </span>
           <span className="flex items-center gap-1">
             <span className="size-1.5 rounded-full bg-emerald-500/50" />
-            Expected return: <span className="text-white/50 font-medium">{mc.expectedReturn >= 0 ? '+' : ''}\u20B9{mc.expectedReturn}Cr</span>
+            Expected return: <span className="text-white/50 font-medium">{mc.expectedReturn >= 0 ? '+' : ''}₹{mc.expectedReturn}Cr</span>
           </span>
           <span className="flex items-center gap-1">
             <span className="size-1.5 rounded-full bg-amber-500/50" />
@@ -254,9 +254,9 @@ export function EvaluationResults({ result, className }: { result: EvaluationRes
         <Separator className="my-3 bg-white/5" />
 
         <div className="flex flex-wrap gap-3 text-[10px] text-white/30">
-          <span>Break-even: \u20B9{result.financialProjection.breakEvenGrossCr}Cr</span>
-          <span>Safe range: \u20B9{result.financialProjection.safeBudgetRange.min}Cr\u2013\u20B9{result.financialProjection.safeBudgetRange.max}Cr</span>
-          <span>Base margin: {margin >= 0 ? '+' : ''}{marginPct}% ({margin >= 0 ? '+' : ''}\u20B9{margin}Cr)</span>
+          <span>Break-even: ₹{result.financialProjection.breakEvenGrossCr}Cr</span>
+          <span>Safe range: ₹{result.financialProjection.safeBudgetRange.min}Cr–₹{result.financialProjection.safeBudgetRange.max}Cr</span>
+          <span>Base margin: {margin >= 0 ? '+' : ''}{marginPct}% ({margin >= 0 ? '+' : ''}₹{margin}Cr)</span>
         </div>
       </div>
 
@@ -270,8 +270,8 @@ export function EvaluationResults({ result, className }: { result: EvaluationRes
               return (
                 <div key={b.category} className="flex flex-wrap items-center gap-3 rounded-lg border border-white/5 bg-black/20 px-3 py-2 text-xs">
                   <span className="w-24 font-medium text-white/70 truncate">{b.category}</span>
-                  <span className="text-white/50">\u20B9{b.userValue}Cr</span>
-                  <span className="text-white/30">(market: \u20B9{b.marketMin}Cr\u2013\u20B9{b.marketMax}Cr)</span>
+                  <span className="text-white/50">₹{b.userValue}Cr</span>
+                  <span className="text-white/30">(market: ₹{b.marketMin}Cr–₹{b.marketMax}Cr)</span>
                   <span className={`ml-auto ${statusColor}`}>{b.status}</span>
                 </div>
               )
@@ -413,9 +413,9 @@ export function EvaluationResults({ result, className }: { result: EvaluationRes
       <div className="mt-6 animate-slide-up rounded-lg border border-white/5 bg-white/[0.02] px-4 py-3" style={{ animationDelay: '1000ms' }}>
         <p className="text-[10px] text-white/20 leading-relaxed">
           Methodology: Continuous outcome model scoring expected gross multiples across {g.components.length} dimensions.
-          Dataset: 729 films (2015\u20132025) with verified financials. ML: 9-feature GBM ensemble with Bayesian shrinkage toward empirical priors.
+          Dataset: 729 films (2015–2025) with verified financials. ML: 9-feature GBM ensemble with Bayesian shrinkage toward empirical priors.
           Simulation: 10,000-path lognormal Monte Carlo with break-even-anchored mean and sample-size-adjusted volatility.
-          Walk-forward validated across 15 annual windows. Survivorship bias: dataset avg 2.72\u00d7 vs real market ~1.0\u00d7.
+          Walk-forward validated across 15 annual windows. Survivorship bias: dataset avg 2.72× vs real market ~1.0×.
         </p>
         {result.timestamp && (
           <p className="mt-1.5 text-[9px] text-white/15">Evaluated {new Date(result.timestamp).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>

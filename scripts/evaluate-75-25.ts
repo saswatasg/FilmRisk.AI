@@ -27,7 +27,9 @@ function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(seededRandom() * (i + 1))
-    ;[a[i], a[j]] = [a[j], a[i]]
+    const tmp = a[i]!
+    a[i] = a[j]!
+    a[j] = tmp
   }
   return a
 }
@@ -94,18 +96,18 @@ for (const f of trainFilms) {
 const sortedTrain = [...trainScores].map(s => s.score).sort((a, b) => a - b)
 const n = sortedTrain.length
 const dataPercentiles: [number, number][] = [
-  [98, sortedTrain[Math.floor(n * 0.98)]],
-  [95, sortedTrain[Math.floor(n * 0.95)]],
-  [90, sortedTrain[Math.floor(n * 0.90)]],
-  [82, sortedTrain[Math.floor(n * 0.82)]],
-  [72, sortedTrain[Math.floor(n * 0.72)]],
-  [60, sortedTrain[Math.floor(n * 0.60)]],
-  [48, sortedTrain[Math.floor(n * 0.48)]],
-  [38, sortedTrain[Math.floor(n * 0.38)]],
-  [28, sortedTrain[Math.floor(n * 0.28)]],
-  [18, sortedTrain[Math.floor(n * 0.18)]],
-  [10, sortedTrain[Math.floor(n * 0.10)]],
-  [5, sortedTrain[Math.floor(n * 0.05)]],
+  [98, sortedTrain[Math.floor(n * 0.98)]!],
+  [95, sortedTrain[Math.floor(n * 0.95)]!],
+  [90, sortedTrain[Math.floor(n * 0.90)]!],
+  [82, sortedTrain[Math.floor(n * 0.82)]!],
+  [72, sortedTrain[Math.floor(n * 0.72)]!],
+  [60, sortedTrain[Math.floor(n * 0.60)]!],
+  [48, sortedTrain[Math.floor(n * 0.48)]!],
+  [38, sortedTrain[Math.floor(n * 0.38)]!],
+  [28, sortedTrain[Math.floor(n * 0.28)]!],
+  [18, sortedTrain[Math.floor(n * 0.18)]!],
+  [10, sortedTrain[Math.floor(n * 0.10)]!],
+  [5, sortedTrain[Math.floor(n * 0.05)]!],
 ]
 
 console.log('\nData-driven percentile buckets (from training set):')
@@ -210,7 +212,8 @@ const confusion: Record<string, Record<string, number>> = {
 
 for (const r of results) {
   const v = r.verdict.toUpperCase()
-  confusion[v][r.actual] = (confusion[v][r.actual] ?? 0) + 1
+  const row = confusion[v]!
+  row[r.actual] = (row[r.actual] ?? 0) + 1
 
   if (r.isHit) allHits++
   if (v === 'GREENLIGHT') {
@@ -269,9 +272,9 @@ console.log(`  Always predict "flop" accuracy: ${(flops / total * 100).toFixed(1
 /* Confusion matrix */
 console.log('\nConfusion Matrix:')
 console.log('               | BLOCKBUSTER | HIT | BREAK_EVEN | BELOW_AVG | FLOP')
-console.log('  GREENLIGHT   |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(confusion.GREENLIGHT[k] ?? 0).padStart(10)}`).join(' |'))
-console.log('  CONDITIONAL  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(confusion.CONDITIONAL[k] ?? 0).padStart(10)}`).join(' |'))
-console.log('  DONT_INVEST  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(confusion.DONT_INVEST[k] ?? 0).padStart(10)}`).join(' |'))
+console.log('  GREENLIGHT   |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(confusion.GREENLIGHT![k] ?? 0).padStart(10)}`).join(' |'))
+console.log('  CONDITIONAL  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(confusion.CONDITIONAL![k] ?? 0).padStart(10)}`).join(' |'))
+console.log('  DONT_INVEST  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(confusion.DONT_INVEST![k] ?? 0).padStart(10)}`).join(' |'))
 
 /* Per-band breakdown */
 console.log('\nPer-band breakdown:')
@@ -299,7 +302,7 @@ for (let offset = -15; offset <= 20; offset += 1) {
   let glCalls = 0, glHits = 0, allHits = 0
 
   for (const r of results) {
-    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']
+    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']!
     const glThresh = Math.max(1, Math.min(99, base.gl + offset))
     const condThresh = Math.max(1, Math.min(99, base.cond + offset))
 
@@ -351,7 +354,7 @@ for (let offset = -15; offset <= 20; offset += 1) {
   let glCalls = 0, glHits = 0, allHits = 0
 
   for (const r of results) {
-    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']
+    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']!
     const glThresh = Math.max(1, Math.min(99, base.gl + offset))
     const condThresh = Math.max(1, Math.min(99, base.cond + offset))
 
@@ -398,26 +401,27 @@ if (bestData) {
     DONT_INVEST: { HIT: 0, BLOCKBUSTER: 0, BREAK_EVEN: 0, BELOW_AVG: 0, FLOP: 0 },
   }
   for (const r of results) {
-    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']
+    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']!
     const glThresh = Math.max(1, Math.min(99, base.gl + bestData.offset))
     const condThresh = Math.max(1, Math.min(99, base.cond + bestData.offset))
     let verdict: string
     if (r.dataPct >= glThresh) verdict = 'GREENLIGHT'
     else if (r.dataPct >= condThresh) verdict = 'CONDITIONAL'
     else verdict = 'DONT_INVEST'
-    bestConf[verdict][r.actual] = (bestConf[verdict][r.actual] ?? 0) + 1
+    const bcRow = bestConf[verdict]!
+    bcRow[r.actual] = (bcRow[r.actual] ?? 0) + 1
   }
   console.log('               | BLOCKBUSTER | HIT | BREAK_EVEN | BELOW_AVG | FLOP')
-  console.log('  GREENLIGHT   |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(bestConf.GREENLIGHT[k] ?? 0).padStart(10)}`).join(' |'))
-  console.log('  CONDITIONAL  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(bestConf.CONDITIONAL[k] ?? 0).padStart(10)}`).join(' |'))
-  console.log('  DONT_INVEST  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(bestConf.DONT_INVEST[k] ?? 0).padStart(10)}`).join(' |'))
+  console.log('  GREENLIGHT   |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(bestConf.GREENLIGHT![k] ?? 0).padStart(10)}`).join(' |'))
+  console.log('  CONDITIONAL  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(bestConf.CONDITIONAL![k] ?? 0).padStart(10)}`).join(' |'))
+  console.log('  DONT_INVEST  |' + ['BLOCKBUSTER', 'HIT', 'BREAK_EVEN', 'BELOW_AVG', 'FLOP'].map(k => ` ${String(bestConf.DONT_INVEST![k] ?? 0).padStart(10)}`).join(' |'))
 }
 
 /* Sample errors (top 10) using data-driven optimal offset */
 const optOffset = bestData ? bestData.offset : 0
 console.log('\nSample errors with optimal data-driven offset:')
 const evalWithOffset = results.map(r => {
-  const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']
+  const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']!
   const glThresh = Math.max(1, Math.min(99, base.gl + optOffset))
   const condThresh = Math.max(1, Math.min(99, base.cond + optOffset))
   let verdict: string

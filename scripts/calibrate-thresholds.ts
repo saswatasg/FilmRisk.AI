@@ -117,7 +117,7 @@ for (let offset = -15; offset <= 10; offset += 1) {
   let glCalls = 0, glHits = 0, allHits = 0
 
   for (const s of allScores) {
-    const base = BASE_PCT_THRESHOLDS[s.band] ?? BASE_PCT_THRESHOLDS['30-60']
+    const base = BASE_PCT_THRESHOLDS[s.band] ?? BASE_PCT_THRESHOLDS['30-60']!
     const glThresh = Math.max(1, Math.min(99, base.gl + offset))
     const condThresh = Math.max(1, Math.min(99, base.cond + offset))
 
@@ -173,5 +173,5 @@ if (best) {
 /* Score distribution summary */
 const scoreVals = allScores.map(s => s.score).sort((a, b) => a - b)
 const n = scoreVals.length
-console.log(`\nScore range: ${scoreVals[0].toFixed(1)}–${scoreVals[n - 1].toFixed(1)}`)
-console.log(`Percentiles: P25=${scoreVals[Math.floor(n * 0.25)].toFixed(1)} P50=${scoreVals[Math.floor(n * 0.5)].toFixed(1)} P75=${scoreVals[Math.floor(n * 0.75)].toFixed(1)}`)
+console.log(`\nScore range: ${scoreVals[0]!.toFixed(1)}–${scoreVals[n - 1]!.toFixed(1)}`)
+console.log(`Percentiles: P25=${scoreVals[Math.floor(n * 0.25)]!.toFixed(1)} P50=${scoreVals[Math.floor(n * 0.5)]!.toFixed(1)} P75=${scoreVals[Math.floor(n * 0.75)]!.toFixed(1)}`)

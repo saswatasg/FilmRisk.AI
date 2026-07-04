@@ -350,9 +350,12 @@ export function calculateGreenlightScore(input: EvaluationInput, stats: DatasetS
     c.contribution < c.weight * 6 && best.contribution / best.weight > c.contribution / c.weight ? c : best
   , components[0]!)
 
-  const evidenceScore = Math.round(datasetContrib * 10 * 10) / 10 || 0
-  const inputScore = Math.round(userContrib * 10 * 10) / 10 || 0
-  const evidencePct = totalScore > 0 ? Math.round((evidenceScore / totalScore) * 100) : 0
+  /* Split adjustedScore (post-ML blend) proportionally into dataset/input components */
+  const dataWeight = adjustedRaw > 0 ? datasetContrib / adjustedRaw : 0.5
+  const userWeight = adjustedRaw > 0 ? userContrib / adjustedRaw : 0.5
+  const evidenceScore = Math.round(adjustedScore * dataWeight * 10) / 10 || 0
+  const inputScore = Math.round(adjustedScore * userWeight * 10) / 10 || 0
+  const evidencePct = adjustedScore > 0 ? Math.round(dataWeight * 100) : 0
 
   const mlStr = mlPrediction !== null ? `ML model predicts ~${mlPrediction.toFixed(2)}× gross multiple (break-even anchored), ` : ''
   const bayesStr = modelStatus.bayes ? `Bayesian shrinkage active across ${modelStatus.filmCount}+ films. ` : ''

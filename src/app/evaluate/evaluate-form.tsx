@@ -80,7 +80,7 @@ const BUDGET_CONTINGENCY = 10
 const BUDGET_FINANCE_PCT = 0.05
 const THEATRICAL_PCT = 40
 
-const PRESALE_PCT: Record<string, number> = {
+const PRESALE_PCT = {
   ott: 0.50, satellite: 0.12, music: 0.15, overseas: 0.18, brand: 0.05,
 }
 
@@ -112,7 +112,7 @@ export function EvaluateForm({ onSubmit, loading, initialInput }: {
   initialInput?: EvaluationInput
 }) {
   const STORAGE_KEY = 'greenlit-evaluate-form'
-  const [step, setStep] = useState(() => {
+  const [step, setStep] = useState<number>(() => {
     if (typeof window === 'undefined') return 0
     const saved = sessionStorage.getItem(STORAGE_KEY)
     if (!saved) return 0
@@ -345,7 +345,7 @@ export function EvaluateForm({ onSubmit, loading, initialInput }: {
             <div className="mt-4 space-y-1 rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
               <p className="text-[10px] text-white/20 leading-relaxed">
                 Reference values shown vs dataset median (gross multiple) or genre average.
-                Only ~30% of films report financials \u2014 dataset avg 2.72\u00d7 vs real ~1.0\u00d7 (survivorship bias).
+                Only ~30% of films report financials — dataset avg 2.72× vs real ~1.0× (survivorship bias).
               </p>
             </div>
           </div>
@@ -411,6 +411,7 @@ const ProjectStep = forwardRef<HTMLInputElement, {
         Project <span className="font-serif-accent">Details</span>
       </h2>
       <p className="mt-1 text-sm text-white/40">Working title, genre, and franchise status</p>
+      <p className="mt-2 text-[11px] text-white/20 leading-relaxed border-l border-white/10 pl-3 italic">Genre drives ~21% of your risk score (Genre Viability + Genre-Budget Fit). Sequels score higher on Concept Quality.</p>
 
       <div className="relative mt-4">
         <Input
@@ -509,6 +510,7 @@ const ConceptStep = forwardRef<HTMLTextAreaElement, {
         Concept <span className="font-serif-accent">Evaluation</span>
       </h2>
       <p className="mt-1 text-sm text-white/40">Premise, clarity, and originality (logline optional)</p>
+      <p className="mt-2 text-[11px] text-white/20 leading-relaxed border-l border-white/10 pl-3 italic">You are the only source for content quality — these sliders form the Concept Quality component (10% of overall score).</p>
 
       <div className="relative mt-4">
         <Textarea
@@ -541,6 +543,15 @@ const ConceptStep = forwardRef<HTMLTextAreaElement, {
             <span>Moderate</span>
             <span>Crystal</span>
           </div>
+          <p className="mt-1.5 text-[10px] text-white/20 leading-relaxed italic">
+            {input.conceptClarity <= 3
+              ? "e.g. 'A man goes on a journey' — premise is too vague to assess"
+              : input.conceptClarity <= 6
+              ? "e.g. 'A disgraced boxer trains for one last fight' — clear stakes, familiar arc"
+              : input.conceptClarity <= 8
+              ? "e.g. 'During the 1992 riots, a boy searches for his missing family' — specific setting, emotional stakes"
+              : "e.g. 'A deaf-mute chess prodigy from a Mumbai slum takes on the world champion' — vivid, complete"}
+          </p>
         </div>
 
         <div className="group/sliderblock">
@@ -561,6 +572,15 @@ const ConceptStep = forwardRef<HTMLTextAreaElement, {
             <span>Fresh</span>
             <span>Breakthrough</span>
           </div>
+          <p className="mt-1.5 text-[10px] text-white/20 leading-relaxed italic">
+            {input.novelty <= 3
+              ? "e.g. 'Boy meets girl, they fall in love, obstacles ensue' — widely used trope"
+              : input.novelty <= 6
+              ? "e.g. 'A time-loop comedy set in a wedding' — familiar genre, fresh angle"
+              : input.novelty <= 8
+              ? "e.g. 'A documentary-style heist film told through Zoom calls' — novel approach"
+              : "e.g. 'First mainstream film shot in an endangered language with a non-professional cast' — genuinely unique"}
+          </p>
         </div>
       </div>
     </div>
@@ -579,6 +599,7 @@ function TalentStep({ input, update, errors }: {
         Cast &amp; <span className="font-serif-accent">Talent</span>
       </h2>
       <p className="mt-1 text-sm text-white/40">Attached director and lead actor</p>
+      <p className="mt-2 text-[11px] text-white/20 leading-relaxed border-l border-white/10 pl-3 italic">Director + Actor quality is the largest scoring component (17% of total). Director predicts returns better than lead actor (55% vs 45% weight).</p>
 
       <div className="mt-5 grid grid-cols-2 gap-5">
         <div className="space-y-3">
@@ -682,6 +703,7 @@ function FinanceStep({
         <span className="font-serif-accent">Financial</span> Plan
       </h2>
       <p className="mt-1 text-sm text-white/40">Total budget and pre-sold rights coverage</p>
+      <p className="mt-2 text-[11px] text-white/20 leading-relaxed border-l border-white/10 pl-3 italic">Budget is the #1 predictor — it feeds Budget Feasibility + Genre-Budget Fit + Production Viability (24% of score). Pre-sale coverage of 40–60% lowers downside risk in simulations.</p>
 
       {/* Budget */}
       <div className="mt-5">
@@ -701,7 +723,7 @@ function FinanceStep({
           <div className="pb-1">
             <span className={`text-xs font-medium ${band?.color || 'text-white/40'}`}>{band?.label || '\u2014'}</span>
             {genreRange && (
-              <p className="text-[10px] text-white/25">Typical: ₹{genreRange.min}\u2013₹{genreRange.max}Cr</p>
+              <p className="text-[10px] text-white/25">Typical: ₹{genreRange.min}–₹{genreRange.max}Cr</p>
             )}
           </div>
         </div>
@@ -812,7 +834,7 @@ function FinanceStep({
                 style={{ width: `${Math.min(coveragePct, 100)}%` }}
               />
             </div>
-            <p className="mt-1 text-[10px] text-white/25">Market: OTT 40\u201360% · Sat ~10% · Music 10\u201320% · OS 10\u201325% · Brand 5\u201315%</p>
+            <p className="mt-1 text-[10px] text-white/25">Market: OTT 40–60% · Sat ~10% · Music 10–20% · OS 10–25% · Brand 5–15%</p>
 
             {preSalesExpanded && (
               <div className="mt-4 grid grid-cols-2 gap-3 pt-3 border-t border-white/5">
@@ -853,6 +875,7 @@ function ReleaseStep({ input, update, marketOpts }: {
         Release &amp; <span className="font-serif-accent">Distribution</span>
       </h2>
       <p className="mt-1 text-sm text-white/40">Release timing, market window, and production house</p>
+      <p className="mt-2 text-[11px] text-white/20 leading-relaxed border-l border-white/10 pl-3 italic">Release timing accounts for ~11% of your score through Seasonality + Market Timing. Production House (4%) adds a track-record signal from 21 tracked houses.</p>
 
       <div className="mt-5 space-y-2">
         <Label className="text-xs text-white/50">Release Month</Label>

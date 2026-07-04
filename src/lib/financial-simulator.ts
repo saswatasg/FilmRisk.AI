@@ -81,7 +81,7 @@ export function calculateFinancialProjection(input: EvaluationInput, stats: Data
 
   function pctile(sorted: number[], pct: number): number {
     const idx = Math.floor(sorted.length * (pct / 100))
-    return sorted[Math.min(idx, sorted.length - 1)]
+    return sorted[Math.min(idx, sorted.length - 1)]!
   }
 
   function scenario(label: string, _pct: number, net: number): ROIScenario {
@@ -110,9 +110,6 @@ export function calculateFinancialProjection(input: EvaluationInput, stats: Data
   ]
 
   const expectedReturn = outcomes.reduce((s, v) => s + v, 0) / SIMULATIONS
-  const expectedMult = expectedReturn > 0
-    ? (expectedReturn + totalCost - totalRights) / (budget * theatricalShare)
-    : 0
 
   const negReturns = outcomes.filter(v => v < 0)
   const downsideRisk = negReturns.length > 0
@@ -124,7 +121,7 @@ export function calculateFinancialProjection(input: EvaluationInput, stats: Data
     p10, p25, p50, p75, p90,
     probProfit: Math.round((profitCount / SIMULATIONS) * 100),
     expectedReturn: parseFloat(expectedReturn.toFixed(2)),
-    expectedMultiple: parseFloat(Math.max(0, expectedMult).toFixed(2)),
+    expectedMultiple: parseFloat(mcMean.toFixed(2)),
     downsideRisk: parseFloat(downsideRisk.toFixed(2)),
   }
 

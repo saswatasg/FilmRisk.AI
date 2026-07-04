@@ -110,15 +110,17 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
     gr.weightedBudget += b * wt
     gr.weightedCount += wt
 
+    let mr: { wins: number; total: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number; normalizedMultSum: number; normalizedWins: number } | undefined
     if (month !== null) {
-      let mr = monthRaw[month]
+      mr = monthRaw[month]
       if (!mr) { mr = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, actualWins: 0, actualCount: 0, normalizedMultSum: 0, normalizedWins: 0 }; monthRaw[month] = mr }
       mr.total += wt
       mr.weightedCount += wt
     }
 
+    let hr: { wins: number; total: number; weightedMultSum: number; weightedCount: number; actualWins: number; actualCount: number; normalizedMultSum: number; normalizedWins: number } | undefined
     if (house) {
-      let hr = houseRaw[house]
+      hr = houseRaw[house]
       if (!hr) { hr = { wins: 0, total: 0, weightedMultSum: 0, weightedCount: 0, actualWins: 0, actualCount: 0, normalizedMultSum: 0, normalizedWins: 0 }; houseRaw[house] = hr }
       hr.total += wt
       hr.weightedCount += wt
@@ -163,14 +165,14 @@ export function computeDatasetStats(films: BollywoodFilm[]): DatasetStats {
       if (normMult >= 1.0) { gbr.wins += wt; gbr.actualWins += 1 }
       gbr.actualCount += 1
 
-      if (month !== null) {
+      if (month !== null && mr) {
         mr.weightedMultSum += mult * wt
         mr.normalizedMultSum += normMult * wt
         if (normMult >= 1.0) { mr.wins += wt; mr.actualWins += 1 }
         mr.actualCount += 1
       }
 
-      if (house) {
+      if (house && hr) {
         hr.weightedMultSum += mult * wt
         hr.normalizedMultSum += normMult * wt
         if (normMult >= 1.0) { hr.wins += wt; hr.actualWins += 1 }

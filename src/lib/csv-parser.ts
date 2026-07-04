@@ -56,13 +56,13 @@ function parseCSVLine(line: string): string[] {
 export function parseCSV(text: string): BollywoodFilm[] {
   const lines = text.split('\n').filter(l => l.trim())
   if (lines.length < 2) return []
-  const headers = parseCSVLine(lines[0]).map(h => h.trim())
+  const headers = parseCSVLine(lines[0]!).map(h => h.trim())
   const films: BollywoodFilm[] = []
   for (let i = 1; i < lines.length; i++) {
     const values = parseCSVLine(lines[i]!)
     if (values.length !== headers.length) continue
     const row: Record<string, string> = {}
-    for (let j = 0; j < headers.length; j++) row[headers[j]] = values[j]! ?? ''
+    for (let j = 0; j < headers.length; j++) row[headers[j]!] = values[j]! ?? ''
     films.push(parseFilm(row))
   }
   return cleanData(films)
