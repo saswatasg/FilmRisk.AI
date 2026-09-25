@@ -1,10 +1,13 @@
 import { eraByYear, eraRightsCoverage } from './industry-constants'
 
-/* Computed from 546-film full-finance training set (75-25 split, era-based scoring, no imputed rows) */
+/* Percentile buckets: empirical cutoffs of adjustedScore on all 729 trainable films
+   scored by the CURRENT engine (neutral backtest concepts), recomputed via
+   scripts/recalibrate-percentiles.ts. Recalibrate after any engine change that
+   shifts the score distribution; then re-run all benchmarks. */
 export const PERCENTILE_BUCKETS: [number, number][] = [
-  [27.3, 98], [25.5, 95], [24.8, 90], [24.0, 82], [23.5, 72],
-  [22.7, 60], [21.9, 48], [21.2, 38], [20.7, 28], [19.8, 18],
-  [18.9, 10], [18.0, 5],
+  [25.1, 98], [24.0, 95], [23.3, 90], [22.5, 82], [22.0, 72],
+  [21.2, 60], [20.5, 48], [19.9, 38], [19.3, 28], [18.6, 18],
+  [17.8, 10], [17.3, 5],
 ]
 
 /* Base thresholds — recalibrate via scripts/calibrate-thresholds.ts after data changes */
@@ -35,15 +38,12 @@ export function backtestRights(budget: number, releaseYear: number | null): {
   }
 }
 
-/* Backtest helpers: derive concept scores from verdict_raw */
-export function backtestConcept(verdict: string): { conceptClarity: number; novelty: number } {
-  const match = verdict.match(/hitFlop=(\d)/)
-  if (!match) return { conceptClarity: 6, novelty: 5 }
-  const v = parseInt(match[1]!)
-  const clarityMap: Record<number, number> = { 1: 4, 2: 5, 3: 6, 4: 7, 5: 8 }
-  const noveltyMap: Record<number, number> = { 1: 3, 2: 4, 3: 5, 4: 6, 5: 7 }
-  return {
-    conceptClarity: clarityMap[v] ?? 6,
-    novelty: noveltyMap[v] ?? 5,
-  }
+/* Backtest helper: neutral concept scores for every film.
+   The CSV contains no content scores, and deriving sliders from a film's own
+   verdict (as earlier versions did) leaks the test outcome into test inputs.
+   Neutral constants remove the leakage; the concept component becomes
+   non-informative in backtests (as it should be — user sliders only exist
+   for real evaluations). Verified honest by the walk-forward fixture. */
+export function backtestConcept(): { conceptClarity: number; novelty: number } {
+  return { conceptClarity: 6, novelty: 5 }
 }

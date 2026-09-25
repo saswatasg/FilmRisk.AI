@@ -1,0 +1,43 @@
+{
+  "benchmark": "75-25-random-split",
+  "primary": false,
+  "appendixOnly": true,
+  "caveat": "In-distribution upper bound. Inflated by temporal leakage (future films leak into training). Never quote as a headline metric.",
+  "generatedAt": "2026-09-24",
+  "trainFilms": 546,
+  "testFilms": 183,
+  "metrics": {
+    "accuracy": {
+      "value": 30.1,
+      "ci95": [
+        23.9,
+        37.1
+      ]
+    },
+    "greenlightPrecision": {
+      "value": 23.5,
+      "ci95": [
+        12.4,
+        40
+      ]
+    },
+    "greenlightRecall": {
+      "value": 42.1,
+      "ci95": [
+        23.1,
+        63.7
+      ]
+    },
+    "f1": {
+      "value": 30.2
+    },
+    "greenlightCalls": {
+      "calls": 34,
+      "hits": 8,
+      "totalHits": 19
+    }
+  },
+  "naiveBaseline": {
+    "alwaysFlopAccuracy": 59.6
+  }
+}

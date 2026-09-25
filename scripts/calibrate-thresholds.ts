@@ -8,7 +8,7 @@ import { budgetBand, normalizedMultiple } from '../src/lib/industry-constants'
 import { PERCENTILE_BUCKETS, BASE_PCT_THRESHOLDS, backtestRights, backtestConcept } from '../src/lib/config'
 import type { EvaluationInput } from '../src/lib/types'
 
-const csvPath = join(__dirname, '..', 'src', 'data', 'bollywood_input.csv')
+const csvPath = join(process.cwd(), 'src', 'data', 'bollywood_input.csv')
 const text = readFileSync(csvPath, 'utf-8')
 const films = parseCSV(text)
 const stats = computeDatasetStats(films)
@@ -45,7 +45,7 @@ const testFilms: TestFilm[] = testable.map(f => ({
 
 function makeInput(f: TestFilm): EvaluationInput {
   const rights = backtestRights(f.budget, f.releaseYear)
-  const concept = backtestConcept(f.verdict)
+  const concept = backtestConcept()
   return {
     filmTitle: 'Calibration',
     secondaryGenre: '',

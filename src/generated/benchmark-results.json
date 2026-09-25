@@ -1,0 +1,217 @@
+{
+  "benchmark": "walk-forward-forward-chaining",
+  "primary": true,
+  "generatedAt": "2026-09-24",
+  "dataset": {
+    "file": "src/data/bollywood_input.csv",
+    "sha256": "ab436a3f90df07a9",
+    "rows": 2454,
+    "trainableFilms": 729
+  },
+  "folds": {
+    "count": 14,
+    "minTrainYear": 2010,
+    "testedFilms": 658
+  },
+  "metrics": {
+    "accuracy": {
+      "value": 29.3,
+      "ci95": [
+        26,
+        32.9
+      ]
+    },
+    "greenlightPrecision": {
+      "value": 11.3,
+      "ci95": [
+        6.8,
+        18.1
+      ]
+    },
+    "greenlightRecall": {
+      "value": 18.7,
+      "ci95": [
+        11.5,
+        28.9
+      ]
+    },
+    "f1": {
+      "value": 14.1,
+      "ci95": [
+        7.9,
+        20.1
+      ]
+    },
+    "greenlightCalls": {
+      "calls": 124,
+      "hits": 14,
+      "totalHits": 75
+    }
+  },
+  "baselines": {
+    "alwaysFlopAccuracy": {
+      "value": 80.5,
+      "note": "majority-class: predict DONT_INVEST for every film, fold train-side flop rate > 50%"
+    },
+    "bandMedianMultiple": {
+      "accuracy": 63.7,
+      "rmse": 1.23,
+      "note": "predict the training-set band-median normalized multiple for every film"
+    },
+    "modelRmseNormalizedMultiple": {
+      "value": 1.303,
+      "note": "GBM RMSE on the normalized multiple vs the band-median baseline RMSE above"
+    },
+    "trainHitRatePrevalence": {
+      "value": 11,
+      "note": "expected GL precision if greenlighting at random = base hit rate"
+    }
+  },
+  "byYear": [
+    {
+      "year": 2012,
+      "n": 40,
+      "accuracy": 50,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "glCalls": 0,
+      "glHits": 0
+    },
+    {
+      "year": 2013,
+      "n": 43,
+      "accuracy": 41.9,
+      "precision": 25,
+      "recall": 20,
+      "f1": 22.2,
+      "glCalls": 4,
+      "glHits": 1
+    },
+    {
+      "year": 2014,
+      "n": 52,
+      "accuracy": 36.5,
+      "precision": 33.3,
+      "recall": 25,
+      "f1": 28.6,
+      "glCalls": 3,
+      "glHits": 1
+    },
+    {
+      "year": 2015,
+      "n": 49,
+      "accuracy": 36.7,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "glCalls": 2,
+      "glHits": 0
+    },
+    {
+      "year": 2016,
+      "n": 68,
+      "accuracy": 26.5,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "glCalls": 3,
+      "glHits": 0
+    },
+    {
+      "year": 2017,
+      "n": 74,
+      "accuracy": 37.8,
+      "precision": 22.2,
+      "recall": 28.6,
+      "f1": 25,
+      "glCalls": 9,
+      "glHits": 2
+    },
+    {
+      "year": 2018,
+      "n": 75,
+      "accuracy": 22.7,
+      "precision": 8.3,
+      "recall": 10,
+      "f1": 9.1,
+      "glCalls": 12,
+      "glHits": 1
+    },
+    {
+      "year": 2019,
+      "n": 68,
+      "accuracy": 22.1,
+      "precision": 18.2,
+      "recall": 22.2,
+      "f1": 20,
+      "glCalls": 11,
+      "glHits": 2
+    },
+    {
+      "year": 2020,
+      "n": 33,
+      "accuracy": 27.3,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "glCalls": 10,
+      "glHits": 0
+    },
+    {
+      "year": 2021,
+      "n": 22,
+      "accuracy": 22.7,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "glCalls": 8,
+      "glHits": 0
+    },
+    {
+      "year": 2022,
+      "n": 32,
+      "accuracy": 6.3,
+      "precision": 0,
+      "recall": 0,
+      "f1": 0,
+      "glCalls": 18,
+      "glHits": 0
+    },
+    {
+      "year": 2023,
+      "n": 33,
+      "accuracy": 27.3,
+      "precision": 25,
+      "recall": 25,
+      "f1": 25,
+      "glCalls": 8,
+      "glHits": 2
+    },
+    {
+      "year": 2024,
+      "n": 32,
+      "accuracy": 15.6,
+      "precision": 12.5,
+      "recall": 50,
+      "f1": 20,
+      "glCalls": 16,
+      "glHits": 2
+    },
+    {
+      "year": 2025,
+      "n": 37,
+      "accuracy": 27,
+      "precision": 15,
+      "recall": 60,
+      "f1": 24,
+      "glCalls": 20,
+      "glHits": 3
+    }
+  ],
+  "thresholdSweep": {
+    "bestF1Offset": -15,
+    "bestF1": 17.9,
+    "currentOffset": 0
+  }
+}

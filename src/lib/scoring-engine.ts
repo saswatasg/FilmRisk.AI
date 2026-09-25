@@ -1,7 +1,8 @@
 import type { EvaluationInput, GreenlightScoreResult, FinancierRiskResult, ScoreComponent, MarketSignalReport } from './types'
 import type { DatasetStats } from './dataset-stats'
 import { scoreMarketSentiment } from './market-signals'
-import { predictMultiple, getModelStatus, getBayesianEstimates } from './ml-predictor'
+import { predictMultiple, getModelStatus, getBayesianEstimates, attributeMultiple } from './ml-predictor'
+import { diagnoseRisk } from './risk-diagnosis'
 import { budgetBand } from './industry-constants'
 import { PERCENTILE_BUCKETS, BASE_PCT_THRESHOLDS } from './config'
 
@@ -337,12 +338,28 @@ export function calculateGreenlightScore(input: EvaluationInput, stats: DatasetS
     const mlScore = Math.round(Math.min(mlPrediction / (3.0 / 10), 100) * 10) / 10 || 0
     adjustedScore = Math.round((adjustedScore * 0.6 + mlScore * 0.4) * 10) / 10 || 0
   }
+  const mlAttribution = attributeMultiple(input, stats)
 
   const realMarketPct = PERCENTILE_BUCKETS.find(([s]) => adjustedScore >= s)?.[1] ?? 1
 
   const band = budgetBand(input.totalBudgetCr)
   const t = BASE_PCT_THRESHOLDS[band] ?? BASE_PCT_THRESHOLDS['30-60']!
-  const verdict = realMarketPct >= t.gl ? 'greenlight' : realMarketPct >= t.cond ? 'conditional' : 'dont_invest'
+  let verdict: 'greenlight' | 'conditional' | 'dont_invest' = realMarketPct >= t.gl ? 'greenlight' : realMarketPct >= t.cond ? 'conditional' : 'dont_invest'
+
+  /* Verdict–risk coherence guard: a project the risk diagnosis rates high or very
+     high risk cannot carry a greenlight — it is capped at conditional, and the cap
+     is stated in the narrative. Conservative direction only (never upgrades).
+     Applies identically in backtests and live evaluations. */
+  let riskCapNote = ''
+  {
+    const risk = diagnoseRisk(input, stats)
+    if (verdict === 'greenlight' && (risk.overallRisk === 'high' || risk.overallRisk === 'very_high')) {
+      verdict = 'conditional'
+      const order: Record<string, number> = { critical: 4, high: 3, moderate: 2, low: 1 }
+      const topRisk = [...risk.factors].sort((a, b) => (order[b.severity] ?? 0) - (order[a.severity] ?? 0))[0]?.factor ?? 'diagnosed risk factors'
+      riskCapNote = `Capped at Conditional: diagnosed risk is ${risk.overallRisk.replace('_', ' ')} (led by ${topRisk}) — clear it before treating this as a go. `
+    }
+  }
 
   const strengths = components.filter(c => c.contribution >= c.weight * 7).map(c => c.label)
   const weaknesses = components.filter(c => c.contribution < c.weight * 3.5).map(c => c.label)
@@ -360,9 +377,10 @@ export function calculateGreenlightScore(input: EvaluationInput, stats: DatasetS
   const mlStr = mlPrediction !== null ? `ML model predicts ~${mlPrediction.toFixed(2)}× gross multiple (break-even anchored), ` : ''
   const bayesStr = modelStatus.bayes ? `Bayesian shrinkage active across ${modelStatus.filmCount}+ films. ` : ''
 
-  const narrativeSummary = `This project scores ${adjustedScore}/100 on a break-even anchored scale. ` +
+  const narrativeSummary = `This project scores ${adjustedScore} on the engine's blend scale (typical range roughly 14–31). ` +
     `${mlStr}` +
-    `Of the total, ${evidencePct}% of weight comes from dataset evidence (${evidenceScore}/100) and ${100 - evidencePct}% from your input assumptions. ` +
+    `${riskCapNote}` +
+    `Of the total, ${evidencePct}% of weight comes from dataset evidence (${evidenceScore}) and ${100 - evidencePct}% from your input assumptions. ` +
     (strengths.length > 0
       ? `Strongest areas: ${listEnglish(strengths)}. `
       : 'No component stands out as a clear strength. ') +
@@ -388,7 +406,7 @@ export function calculateGreenlightScore(input: EvaluationInput, stats: DatasetS
   const confidence = filled >= 4 && finFields >= 2 ? 'high' : filled >= 2 ? 'medium' : 'low'
   const confidenceInterval = computeConfidenceInterval(components)
 
-  return { totalScore, adjustedScore, evidenceScore, inputScore, evidencePct, realMarketPct, verdict, components, confidence, confidenceInterval, narrativeSummary }
+  return { totalScore, adjustedScore, evidenceScore, inputScore, evidencePct, realMarketPct, verdict, components, confidence, confidenceInterval, narrativeSummary, mlAttribution }
 }
 
 function finBudgetRisk(input: EvaluationInput, stats: DatasetStats): ScoreComponent {

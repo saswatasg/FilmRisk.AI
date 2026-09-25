@@ -1,5 +1,29 @@
 # FilmRisk Bollywood — Data Science Review
 
+> **⚠ HISTORICAL DOCUMENT — SUPERSEDED.** This review audits the system as it existed in
+> **May 2026 (v0)**, before the continuous-model rewrite, era-aware break-even, and honest
+> walk-forward benchmark landed (commits `c9a8da7`, `0b2f189`, `8e0ec54`). It is preserved as
+> the engineering audit trail. **Do not cite it for current behavior** — the canonical
+> references are `docs/model-overview.md`, `docs/anchored-summary.md`, `docs/era-constants-sources.md`,
+> and the generated benchmark fixture (`src/generated/benchmark-results.json`).
+>
+> Corrections (v0 claim → current reality, verified against code/data):
+>
+> | # | This document says | Current implementation (verified) |
+> |---|---|---|
+> | 1 | 23-dimensional feature vector (16 genre one-hots) | **9-dim** canonical vector; genre deliberately excluded from GBM (Bayesian model owns genre) — `gbm-model.ts:extractFeatures` |
+> | 2 | `SURVIVORSHIP_ADJ = 1/2.72 = 0.37` applied to scores | Removed. Replaced by **era-aware break-even normalization** of the target (`industry-constants.ts`); scores are not discounted post-hoc |
+> | 3 | GBM trained on raw `gross_multiple`, 150-tree override | GBM trained on **break-even-normalized multiple**, 200 trees (CV-tuned over 100–300), seeded PRNG |
+> | 4 | Old percentile buckets `[47,98]…[3,5]` | `config.ts:PERCENTILE_BUCKETS` `[27.3,98]…[18.0,5]` (recomputed from training data) |
+> | 5 | Monte Carlo `baseSigma = 0.6` | `BASE_SIGMA = 1.55` + band-calibrated `BAND_SIGMA` (verified: std(log(normalized)) = 1.554 on training data) |
+> | 6 | `>200 Cr` band catch-all concern | Resolved: bands split into `200-300` and `>300` |
+> | 7 | No CV for GBM hyperparameters | 3-fold time-series CV implemented (`crossValidateGBM`) |
+> | 8 | OOS "93.3% precision" on n=30 (§6.6) | **Retired as a headline figure.** Walk-forward is the primary benchmark; 93.3% came from a small, partially in-sample run and is not quoted anywhere buyer-facing |
+> | 9 | 2,209 rows / 679 full-finance / 105 imputed | Current dataset: **2,454 rows / 729 full-finance / 236 imputed** (excluded from training, `npm run verify:pr1`) |
+> | 10 | Bayesian model "not directly used in any scoring path" | Reinstituted: Bayes posteriors feed small-sample shrinkage in scoring components (`scoring-engine.ts:shrunkenMultiple`, `bayesianComponentScore`) |
+>
+> Acceptance-tested by `npm run verify:pr3` (feature-vector canonicalization).
+
 ## 1. System Architecture
 
 ```

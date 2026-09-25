@@ -1,4 +1,11 @@
-import { readFileSync } from 'fs'
+/*
+  APPENDIX benchmark — 75-25 random split (in-distribution upper bound).
+  Random splitting leaks future films into training, inflating metrics.
+  This is NOT a headline benchmark: walk-forward (npm run benchmark) is primary.
+  Emits: src/generated/benchmark-75-25.json (labeled appendix).
+  Run: npm run benchmark:75-25
+*/
+import { readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { parseCSV } from '../src/lib/csv-parser'
 import { computeDatasetStats } from '../src/lib/dataset-stats'
@@ -9,7 +16,7 @@ import { budgetBand, normalizedMultiple } from '../src/lib/industry-constants'
 import { BASE_PCT_THRESHOLDS, backtestRights, backtestConcept } from '../src/lib/config'
 import type { EvaluationInput } from '../src/lib/types'
 
-const csvPath = join(__dirname, '..', 'src', 'data', 'bollywood_input.csv')
+const csvPath = join(process.cwd(), 'src', 'data', 'bollywood_input.csv')
 const text = readFileSync(csvPath, 'utf-8')
 const films = imputeFinance(parseCSV(text))
 
@@ -60,7 +67,7 @@ interface TrainScore { score: number }
 const trainScores: TrainScore[] = []
 for (const f of trainFilms) {
   const rights = backtestRights(f.budget_cr!, f.release_year)
-  const concept = backtestConcept(f.verdict_raw)
+  const concept = backtestConcept()
   const input: EvaluationInput = {
     filmTitle: f.display_title ?? 'Train',
     secondaryGenre: f.secondary_genre ?? '',
@@ -133,6 +140,7 @@ interface Result {
   isHit: boolean
   band: string
   verdict: string
+  riskCapped: boolean
   budget: number
 }
 
@@ -151,7 +159,7 @@ function isHit(actual: string): boolean {
 const results: Result[] = []
 for (const f of testFilms) {
   const rights = backtestRights(f.budget_cr!, f.release_year)
-  const concept = backtestConcept(f.verdict_raw)
+  const concept = backtestConcept()
   const input: EvaluationInput = {
     filmTitle: f.display_title ?? 'Test',
     secondaryGenre: f.secondary_genre ?? '',
@@ -184,9 +192,14 @@ for (const f of testFilms) {
   const normMult = normalizedMultiple(f.worldwide_gross_cr! / f.budget_cr!, f.budget_cr!, f.release_year)
   const actual = actualClass(normMult)
 
+  const uncapped75 = (() => {
+    const t = BASE_PCT_THRESHOLDS[budgetBand(f.budget_cr!)] ?? BASE_PCT_THRESHOLDS['30-60']!
+    return result.realMarketPct >= t.gl ? 'GREENLIGHT' : result.realMarketPct >= t.cond ? 'CONDITIONAL' : 'DONT_INVEST'
+  })()
   results.push({
     score: result.adjustedScore,
     pct: result.realMarketPct,
+    riskCapped: uncapped75 === 'GREENLIGHT' && result.verdict.toUpperCase() !== 'GREENLIGHT',
     dataPct: scoreToDataPct(result.adjustedScore),
     normMult,
     actual,
@@ -249,7 +262,10 @@ const accCI = wilsonCI(correct, total)
 const precCI = glCalls > 0 ? wilsonCI(glHits, glCalls) : { lower: 0, upper: 1 }
 const recCI = allHits > 0 ? wilsonCI(glHits, allHits) : { lower: 0, upper: 1 }
 
-console.log(`\n=== 75-25 RANDOM SPLIT EVALUATION (full engine) ===\n`)
+console.log(`\n=== 75-25 RANDOM SPLIT EVALUATION (full engine) ===`)
+console.log(`APPENDIX ONLY — in-distribution upper bound. Temporal leakage: future films`)
+console.log(`leak into training under random splitting, so these numbers are INFLATED.`)
+console.log(`The primary benchmark is walk-forward: npm run benchmark (src/generated/benchmark-results.json).\n`)
 
 console.log(`Overall Accuracy: ${(accuracy * 100).toFixed(1)}% (${correct}/${total})`)
 console.log(`  Wilson 95% CI: [${(accCI.lower * 100).toFixed(1)}%, ${(accCI.upper * 100).toFixed(1)}%]\n`)
@@ -289,6 +305,19 @@ for (const band of bands) {
   console.log(`  ${band}: n=${bandResults.length}, hits=${bandHits}, GL=${bandGL}, GL prec=${(bandPrec * 100).toFixed(1)}%`)
 }
 
+
+function sweepVerdict75(pct: number, band: string, offset: number, riskCapped: boolean): string {
+  const base = BASE_PCT_THRESHOLDS[band] ?? BASE_PCT_THRESHOLDS['30-60']!
+  const glThresh = Math.max(1, Math.min(99, base.gl + offset))
+  const condThresh = Math.max(1, Math.min(99, base.cond + offset))
+  let verdict: string
+  if (pct >= glThresh) verdict = 'GREENLIGHT'
+  else if (pct >= condThresh) verdict = 'CONDITIONAL'
+  else verdict = 'DONT_INVEST'
+  if (verdict === 'GREENLIGHT' && riskCapped) verdict = 'CONDITIONAL'
+  return verdict
+}
+
 /* ───── Threshold calibration sweep ───── */
 console.log('\n\n=== Threshold Sweep (75-25 split) ===')
 console.log('Offset  |  Acc    Prec   Rec    F1     GL calls  GL hits  All hits')
@@ -302,14 +331,7 @@ for (let offset = -15; offset <= 20; offset += 1) {
   let glCalls = 0, glHits = 0, allHits = 0
 
   for (const r of results) {
-    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']!
-    const glThresh = Math.max(1, Math.min(99, base.gl + offset))
-    const condThresh = Math.max(1, Math.min(99, base.cond + offset))
-
-    let verdict: string
-    if (r.pct >= glThresh) verdict = 'GREENLIGHT'
-    else if (r.pct >= condThresh) verdict = 'CONDITIONAL'
-    else verdict = 'DONT_INVEST'
+    const verdict = sweepVerdict75(r.pct, r.band, offset, r.riskCapped)
 
     total++
     if (r.isHit) allHits++
@@ -354,14 +376,7 @@ for (let offset = -15; offset <= 20; offset += 1) {
   let glCalls = 0, glHits = 0, allHits = 0
 
   for (const r of results) {
-    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']!
-    const glThresh = Math.max(1, Math.min(99, base.gl + offset))
-    const condThresh = Math.max(1, Math.min(99, base.cond + offset))
-
-    let verdict: string
-    if (r.dataPct >= glThresh) verdict = 'GREENLIGHT'
-    else if (r.dataPct >= condThresh) verdict = 'CONDITIONAL'
-    else verdict = 'DONT_INVEST'
+    const verdict = sweepVerdict75(r.dataPct, r.band, offset, r.riskCapped)
 
     total++
     if (r.isHit) allHits++
@@ -401,13 +416,7 @@ if (bestData) {
     DONT_INVEST: { HIT: 0, BLOCKBUSTER: 0, BREAK_EVEN: 0, BELOW_AVG: 0, FLOP: 0 },
   }
   for (const r of results) {
-    const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']!
-    const glThresh = Math.max(1, Math.min(99, base.gl + bestData.offset))
-    const condThresh = Math.max(1, Math.min(99, base.cond + bestData.offset))
-    let verdict: string
-    if (r.dataPct >= glThresh) verdict = 'GREENLIGHT'
-    else if (r.dataPct >= condThresh) verdict = 'CONDITIONAL'
-    else verdict = 'DONT_INVEST'
+    const verdict = sweepVerdict75(r.dataPct, r.band, bestData.offset, r.riskCapped)
     const bcRow = bestConf[verdict]!
     bcRow[r.actual] = (bcRow[r.actual] ?? 0) + 1
   }
@@ -421,13 +430,7 @@ if (bestData) {
 const optOffset = bestData ? bestData.offset : 0
 console.log('\nSample errors with optimal data-driven offset:')
 const evalWithOffset = results.map(r => {
-  const base = BASE_PCT_THRESHOLDS[r.band] ?? BASE_PCT_THRESHOLDS['30-60']!
-  const glThresh = Math.max(1, Math.min(99, base.gl + optOffset))
-  const condThresh = Math.max(1, Math.min(99, base.cond + optOffset))
-  let verdict: string
-  if (r.dataPct >= glThresh) verdict = 'GREENLIGHT'
-  else if (r.dataPct >= condThresh) verdict = 'CONDITIONAL'
-  else verdict = 'DONT_INVEST'
+  const verdict = sweepVerdict75(r.dataPct, r.band, optOffset, r.riskCapped)
 
   let correct = false
   if (verdict === 'GREENLIGHT' && r.isHit) correct = true
@@ -440,3 +443,28 @@ const evalWithOffset = results.map(r => {
 for (const r of evalWithOffset) {
   console.log(`  ₹${r.budget}Cr, ${r.normMult.toFixed(2)}x norm, actual=${r.actual}, pred=${r.verdict} (score=${r.score}, dataPct=${r.dataPct})`)
 }
+
+/* ───── Appendix fixture ───── */
+const pct = (x: number) => Math.round(x * 1000) / 10
+const fixture = {
+  benchmark: '75-25-random-split',
+  primary: false,
+  appendixOnly: true,
+  caveat: 'In-distribution upper bound. Inflated by temporal leakage (future films leak into training). Never quote as a headline metric.',
+  generatedAt: new Date().toISOString().slice(0, 10),
+  trainFilms: trainFilms.length,
+  testFilms: total,
+  metrics: {
+    accuracy: { value: pct(accuracy), ci95: [pct(accCI.lower), pct(accCI.upper)] },
+    greenlightPrecision: { value: pct(precision), ci95: [pct(precCI.lower), pct(precCI.upper)] },
+    greenlightRecall: { value: pct(recall), ci95: [pct(recCI.lower), pct(recCI.upper)] },
+    f1: { value: pct(f1) },
+    greenlightCalls: { calls: glCalls, hits: glHits, totalHits: allHits },
+  },
+  naiveBaseline: { alwaysFlopAccuracy: pct(flops / total) },
+}
+
+const outDir = join(process.cwd(), 'src', 'generated')
+mkdirSync(outDir, { recursive: true })
+writeFileSync(join(outDir, 'benchmark-75-25.json'), JSON.stringify(fixture, null, 2) + '\n')
+console.log(`\nAppendix fixture written: src/generated/benchmark-75-25.json`)

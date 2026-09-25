@@ -1,0 +1,78 @@
+{
+  "generatedAt": "2026-09-24",
+  "note": "Computed from full-finance films. S tier has no data and is scored by rank proxy.",
+  "actor": {
+    "S": {
+      "label": "S tier",
+      "desc": "Opens on name alone — no track record in our data; scored by rank proxy",
+      "films": 0,
+      "medianBudgetCr": null,
+      "hitRatePct": null
+    },
+    "A": {
+      "label": "A tier",
+      "desc": "Consistent headliner",
+      "films": 38,
+      "medianBudgetCr": 50.5,
+      "hitRatePct": 15.8
+    },
+    "B": {
+      "label": "B tier",
+      "desc": "Established face",
+      "films": 66,
+      "medianBudgetCr": 35,
+      "hitRatePct": 10.6
+    },
+    "C": {
+      "label": "C tier",
+      "desc": "Rising / recognisable",
+      "films": 189,
+      "medianBudgetCr": 52,
+      "hitRatePct": 10.6
+    },
+    "D": {
+      "label": "D tier",
+      "desc": "Newcomer / character actor",
+      "films": 311,
+      "medianBudgetCr": 19,
+      "hitRatePct": 8
+    }
+  },
+  "director": {
+    "S": {
+      "label": "S tier",
+      "desc": "Opens on name alone — no track record in our data; scored by rank proxy",
+      "films": 0,
+      "medianBudgetCr": null,
+      "hitRatePct": null
+    },
+    "A": {
+      "label": "A tier",
+      "desc": "Consistent headliner",
+      "films": 5,
+      "medianBudgetCr": 96,
+      "hitRatePct": 80
+    },
+    "B": {
+      "label": "B tier",
+      "desc": "Established face",
+      "films": 3,
+      "medianBudgetCr": 59,
+      "hitRatePct": 33.3
+    },
+    "C": {
+      "label": "C tier",
+      "desc": "Rising / recognisable",
+      "films": 29,
+      "medianBudgetCr": 72,
+      "hitRatePct": 13.8
+    },
+    "D": {
+      "label": "D tier",
+      "desc": "Newcomer / character actor",
+      "films": 139,
+      "medianBudgetCr": 30,
+      "hitRatePct": 5.8
+    }
+  }
+}

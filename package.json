@@ -6,7 +6,20 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "verify": "tsx scripts/verify-acceptance.ts",
+    "verify:pr1": "tsx scripts/verify-data-foundation.ts",
+    "verify:pr2": "tsx scripts/verify-eras.ts",
+    "verify:pr3": "tsx scripts/verify-features.ts",
+    "verify:pr4": "tsx scripts/verify-benchmarks.ts",
+    "verify:pr7": "tsx scripts/verify-explainability.ts",
+    "benchmark": "tsx scripts/evaluate-forward-chaining.ts",
+    "benchmark:75-25": "tsx scripts/evaluate-75-25.ts",
+    "calibrate": "tsx scripts/calibrate-thresholds.ts",
+    "track-record": "tsx scripts/track-record.ts",
+    "tiers": "tsx scripts/generate-tier-reference.ts",
+    "demo": "tsx scripts/demo.ts",
+    "verify:flow": "tsx scripts/verify-flow.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -14,21 +27,25 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",
     "next": "16.2.6",
-    "papaparse": "^5.5.3",
+    "pg": "^8.23.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "razorpay": "^2.9.8",
     "shadcn": "^4.8.3",
     "tailwind-merge": "^3.6.0",
     "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/pg": "^8.11.14",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "bcryptjs": "^2.4.3",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

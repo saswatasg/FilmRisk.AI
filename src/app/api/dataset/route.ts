@@ -1,26 +1,12 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
-import { parseCSV, computeDatasetSummary } from '@/lib/csv-parser'
-
-let cachedFilms: ReturnType<typeof parseCSV> | null = null
-let cachedSummary: ReturnType<typeof computeDatasetSummary> | null = null
-
-function loadFilms() {
-  if (cachedFilms) return cachedFilms
-  const filePath = path.join(process.cwd(), 'src', 'data', 'bollywood_input.csv')
-  const text = fs.readFileSync(filePath, 'utf-8')
-  cachedFilms = parseCSV(text)
-  return cachedFilms
-}
+import { loadDataset } from '@/lib/dataset-loader'
+import { computeDatasetSummary } from '@/lib/csv-parser'
 
 export async function GET() {
   try {
-    const films = loadFilms()
-    if (!cachedSummary) {
-      cachedSummary = computeDatasetSummary(films)
-    }
-    return NextResponse.json({ summary: cachedSummary, count: films.length })
+    /* Same pipeline as /api/evaluate (parse + impute), so counts agree across surfaces. */
+    const { films } = loadDataset()
+    return NextResponse.json({ summary: computeDatasetSummary(films), count: films.length })
   } catch {
     return NextResponse.json({ error: 'Failed to load dataset' }, { status: 500 })
   }

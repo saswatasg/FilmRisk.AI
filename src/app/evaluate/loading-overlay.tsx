@@ -22,7 +22,7 @@ const PHASES: Phase[] = [
     id: 'dataset',
     label: 'Dataset Pipeline',
     steps: [
-      { id: 'load', label: 'Loading film database', detail: '729 records spanning 2015\u20132025' },
+      { id: 'load', label: 'Loading film database', detail: '2,454 records · 2001–2025' },
       { id: 'parse', label: 'Parsing financial records', detail: 'Budget, box office, talent, genre' },
       { id: 'genre', label: 'Computing genre distributions', detail: 'Average gross multiples per genre' },
       { id: 'budget', label: 'Computing budget band stats', detail: 'Break-even rates by budget range' },
@@ -32,12 +32,12 @@ const PHASES: Phase[] = [
     id: 'scoring',
     label: 'Scoring Engine',
     steps: [
-      { id: 'gviability', label: 'Genre Viability', detail: '18 thriller films \u2014 1.42x break-even avg' },
-      { id: 'gbfit', label: 'Genre-Budget Fit', detail: '5 genre+budget combos \u2014 0.52x break-even' },
-      { id: 'bfeasibility', label: 'Budget Feasibility', detail: '76 films in 30-60Cr band \u2014 0.79x break-even' },
-      { id: 'tstrength', label: 'Talent Strength', detail: 'Director A + Actor D \u2014 weighted composite' },
+      { id: 'gviability', label: 'Genre Viability', detail: 'Genre track records vs break-even' },
+      { id: 'gbfit', label: 'Genre-Budget Fit', detail: 'Genre and budget interactions' },
+      { id: 'bfeasibility', label: 'Budget Feasibility', detail: 'Budget-band recovery rates' },
+      { id: 'tstrength', label: 'Talent Strength', detail: 'Director and actor track records' },
       { id: 'psales', label: 'Pre-Sale Coverage', detail: 'Computing coverage ratio vs market ranges' },
-      { id: 'season', label: 'Seasonality Impact', detail: '99 June releases \u2014 0.62x break-even avg' },
+      { id: 'season', label: 'Seasonality Impact', detail: 'Release-month recovery rates' },
     ],
   },
   {
@@ -54,7 +54,7 @@ const PHASES: Phase[] = [
     label: 'Risk Simulation',
     steps: [
       { id: 'mc', label: 'Monte Carlo path simulation', detail: '10,000 lognormal paths \u2014 sigma from sample size' },
-      { id: 'sensi', label: 'Sensitivity analysis', detail: 'Top-5 score levers identified' },
+      { id: 'sensi', label: 'Sensitivity analysis', detail: 'Material score levers identified' },
       { id: 'factors', label: 'Risk factor diagnosis', detail: 'Weighted severity scoring across 10 dimensions' },
     ],
   },
@@ -67,8 +67,8 @@ const PHASES: Phase[] = [
   },
 ]
 
-const DALITS = [
-  'Dataset survivorship bias: 70% of films missing financial data \u2014 real market avg ~1.0x vs dataset 2.72x',
+const FACTS = [
+  'Dataset survivorship bias: 70% of films missing financial data \u2014 real market avg ~1.0x vs dataset median 1.21x',
   'Historical Bollywood break-even rate across all budget bands: ~58%',
   'OTT rights now account for 40\u201360% of total pre-sale value (up from <20% pre-2018)',
   'Director track record predicts greenlight outcomes 1.4x better than lead actor alone',
@@ -76,7 +76,7 @@ const DALITS = [
   'Week 1 multiplex split: ~41% to distributor after GST',
   'Satellite rights collapsed to ~10% of budget (down from 30\u201350% pre-pandemic)',
   'Genre-budget fit is the single most predictive component for films under \u20B950Cr',
-  'Walk-forward validation: model tested on 619 films across 15 annual windows',
+  'Walk-forward validation: model tested on 658 films across 14 rolling annual folds',
 ]
 
 export function LoadingOverlay({ onComplete }: { onComplete: () => void }) {
@@ -85,7 +85,7 @@ export function LoadingOverlay({ onComplete }: { onComplete: () => void }) {
   )
   const [progressPct, setProgressPct] = useState(2)
   const [elapsed, setElapsed] = useState(0)
-  const [dalitIdx, setDalitIdx] = useState(0)
+  const [factIdx, setFactIdx] = useState(0)
   const [estimatedTotal] = useState(() => 14000 + Math.random() * 11000)
 
   const allSteps = useMemo(() => PHASES.flatMap(p => p.steps), [])
@@ -97,8 +97,8 @@ export function LoadingOverlay({ onComplete }: { onComplete: () => void }) {
     const startTime = Date.now()
     const stepInterval = estimatedTotal / totalSteps
 
-    const dalitTimer = setInterval(() => {
-      setDalitIdx(i => (i + 1) % DALITS.length)
+    const factTimer = setInterval(() => {
+      setFactIdx(i => (i + 1) % FACTS.length)
     }, 6000)
 
     const interval = setInterval(() => {
@@ -106,7 +106,7 @@ export function LoadingOverlay({ onComplete }: { onComplete: () => void }) {
       if (idx >= totalSteps) {
         const remaining = estimatedTotal - (Date.now() - startTime)
         setTimeout(() => {
-          clearInterval(dalitTimer)
+          clearInterval(factTimer)
           onComplete()
         }, Math.max(remaining, 400))
         clearInterval(interval)
@@ -133,7 +133,7 @@ export function LoadingOverlay({ onComplete }: { onComplete: () => void }) {
       completedRef.current++
     }, stepInterval)
 
-    return () => { clearInterval(interval); clearInterval(dalitTimer) }
+    return () => { clearInterval(interval); clearInterval(factTimer) }
   }, [onComplete, allSteps, totalSteps])
 
   function getPhaseState(pi: number): 'future' | 'active' | 'past' {
@@ -156,13 +156,13 @@ export function LoadingOverlay({ onComplete }: { onComplete: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#181818]/95 backdrop-blur-sm">
       <div className="w-full max-w-lg px-6">
         <div className="mb-8 text-center">
-          <h2 className="text-lg font-semibold text-white/90">Analyzing Project</h2>
-          <p className="mt-1 text-xs text-white/30">
-            {totalSteps} analysis steps &middot; {(elapsed / 1000).toFixed(1)}s elapsed
-            {estimatedTotal > 0 && <span> &middot; target ~{(estimatedTotal / 1000).toFixed(0)}s</span>}
+          <p className="eyebrow text-[#8f8f8f]">Greenlit<span className="text-white">.</span></p>
+          <h2 className="mt-3 text-[26px] font-medium tracking-[0.2px] text-white">Preparing your memorandum</h2>
+          <p className="tnum mt-1 text-[11px] text-[#8f8f8f]">
+            {(elapsed / 1000).toFixed(1)}s elapsed
           </p>
         </div>
 
@@ -174,27 +174,15 @@ export function LoadingOverlay({ onComplete }: { onComplete: () => void }) {
                 ps === 'future' ? 'opacity-20' : ps === 'past' ? 'opacity-60' : 'opacity-100'
               }`}>
                 <div className="mb-1.5 flex items-center gap-2">
-                  <div className={`relative flex size-2 items-center justify-center transition-all duration-500 ${
-                    ps === 'past'
-                      ? 'text-emerald-500'
-                      : ps === 'active'
-                        ? 'text-emerald-400'
-                        : 'text-white/20'
-                  }`}>
-                    <div className={`size-2 rounded-full ${
-                      ps === 'past' ? 'bg-emerald-500' : ps === 'active'
-                        ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]' : 'bg-white/20'
+                  <div className="relative flex size-2 items-center justify-center">
+                    <div className={`size-1.5 rounded-full ${
+                      ps === 'past' ? 'bg-white/70' : ps === 'active' ? 'bg-white' : 'bg-white/20'
                     }`} />
-                    {ps === 'active' && (
-                      <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/30" />
-                    )}
                   </div>
-                  <span className={`text-[10px] font-semibold uppercase tracking-wider ${
-                    ps === 'past' ? 'text-emerald-400/80' : 'text-white/50'
-                  }`}>
+                  <span className="eyebrow text-[#969696]">
                     {phase.label}
                   </span>
-                  {ps === 'past' && <CheckCircle2 className="size-2.5 text-emerald-500/70" />}
+                  {ps === 'past' && <CheckCircle2 className="size-2.5 text-white/70" />}
                 </div>
 
                 <div className="ml-4 space-y-0.5 border-l border-white/5 pl-3">
@@ -208,19 +196,19 @@ export function LoadingOverlay({ onComplete }: { onComplete: () => void }) {
                         }`}
                       >
                         {status === 'done' ? (
-                          <CheckCircle2 className="size-3 shrink-0 text-emerald-500/80" />
+                          <CheckCircle2 className="size-3 shrink-0 text-white/70" />
                         ) : status === 'active' ? (
-                          <Loader2 className="size-3 shrink-0 animate-spin text-emerald-400" />
+                          <Loader2 className="size-3 shrink-0 animate-spin text-white" />
                         ) : (
-                          <Circle className="size-3 shrink-0 text-white/8" />
+                          <Circle className="size-3 shrink-0 text-white/10" />
                         )}
-                        <span className={`text-xs transition-all duration-300 ${
-                          status === 'done' ? 'text-white/50' : status === 'active' ? 'text-white/80' : 'text-white/15'
+                        <span className={`text-xs transition-colors duration-300 ${
+                          status === 'done' ? 'text-[#969696]' : status === 'active' ? 'text-white' : 'text-[#8f8f8f]'
                         }`}>
                           {step.label}
                         </span>
                         {status === 'active' && (
-                          <span className="ml-auto shrink-0 whitespace-nowrap text-[9px] text-white/30">
+                          <span className="ml-auto shrink-0 whitespace-nowrap text-[9px] text-[#8f8f8f]">
                             {step.detail}
                           </span>
                         )}
@@ -234,23 +222,21 @@ export function LoadingOverlay({ onComplete }: { onComplete: () => void }) {
         </div>
 
         <div className="mt-8">
-          <div className="relative h-1 w-full overflow-hidden rounded-full bg-white/5">
-            <div className="absolute inset-0 animate-shimmer" />
+          <div className="relative h-px w-full overflow-hidden bg-white/10">
             <div
-              className="relative h-full rounded-full bg-gradient-to-r from-emerald-700 via-emerald-400 to-emerald-600 transition-all duration-500 ease-out"
+              className="relative h-full bg-white transition-all duration-500 ease-out"
               style={{ width: `${progressPct}%` }}
             />
           </div>
-          <div className="mt-1.5 flex justify-between text-[9px] text-white/20">
-            <span>Initializing</span>
+          <div className="tnum mt-2 flex justify-between text-[10px] text-[#8f8f8f]">
+            <span>Preparing memorandum</span>
             <span>{progressPct}%</span>
-            <span>Finalizing</span>
           </div>
         </div>
 
-        <div className="mt-6 h-10 overflow-hidden rounded-lg border border-white/5 bg-white/[0.02] px-3 py-2">
-          <p className="animate-slide-up text-[9px] leading-relaxed text-white/20" key={dalitIdx}>
-            {DALITS[dalitIdx]!}
+        <div className="mt-6 h-10 overflow-hidden">
+          <p className="animate-slide-up font-medium text-[13px] leading-relaxed text-[#969696]" key={factIdx}>
+            {FACTS[factIdx]!}
           </p>
         </div>
       </div>

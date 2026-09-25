@@ -1,5 +1,8 @@
 export const PRODUCER_REALISATION_RATE = 0.32
 
+/* Era tables are VERIFIED fixtures — sources, rationale, and change policy:
+   docs/era-constants-sources.md. Guarded by scripts/verify-eras.ts (npm run verify:pr2). */
+
 export type Era = 'pre_ott' | 'ott_growth' | 'covid' | 'mature'
 
 export function eraByYear(year: number | null | undefined): Era {

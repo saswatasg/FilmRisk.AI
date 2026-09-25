@@ -2,7 +2,7 @@
 
 import type { BollywoodFilm, EvaluationInput } from './types'
 import type { DatasetStats } from './dataset-stats'
-import { trainGBM, predictGBM, featureImportance, extractFeatures, crossValidateGBM, type GBMConfig } from './gbm-model'
+import { trainGBM, predictGBM, featureImportance, extractFeatures, crossValidateGBM, attributeGBM, type GBMConfig } from './gbm-model'
 import { computeBayesianEstimates, type BayesianEstimates } from './bayesian-model'
 import { normalizedMultiple } from './industry-constants'
 
@@ -51,15 +51,13 @@ export function getModelStatus(): { gbm: boolean; bayes: boolean; filmCount: num
 
 /* ───── GBM prediction from EvaluationInput ───── */
 
-export function predictMultiple(input: EvaluationInput, stats?: DatasetStats): number | null {
-  if (!trainedGBM) return null
-
+function buildInputFeatures(input: EvaluationInput, stats?: DatasetStats): number[] {
   const aRank = stats?.actorTierStats[input.actorTier]?.avgRankScore
     ?? (input.actorTier === 'S' ? 95 : input.actorTier === 'A' ? 80 : input.actorTier === 'B' ? 55 : input.actorTier === 'C' ? 30 : 10)
   const dRank = stats?.directorTierStats[input.directorTier]?.avgRankScore
     ?? (input.directorTier === 'S' ? 95 : input.directorTier === 'A' ? 80 : input.directorTier === 'B' ? 55 : input.directorTier === 'C' ? 30 : 10)
 
-  const features = extractFeatures({
+  return extractFeatures({
     budget_cr: input.totalBudgetCr || 30,
     actor_tier_proxy: input.actorTier || 'C',
     director_tier_proxy: input.directorTier || 'C',
@@ -68,8 +66,22 @@ export function predictMultiple(input: EvaluationInput, stats?: DatasetStats): n
     release_month_num: input.releaseMonth || 6,
     sequel_flag: input.sequelFlag,
   })
+}
 
-  return predictGBM(trainedGBM, features)
+export function predictMultiple(input: EvaluationInput, stats?: DatasetStats): number | null {
+  if (!trainedGBM) return null
+  return predictGBM(trainedGBM, buildInputFeatures(input, stats))
+}
+
+export function attributeMultiple(input: EvaluationInput, stats?: DatasetStats): {
+  base: number
+  offset: number
+  prediction: number
+  features: { name: string; contribution: number }[]
+} | null {
+  if (!trainedGBM) return null
+  const { base, offset, prediction, attributions } = attributeGBM(trainedGBM, buildInputFeatures(input, stats))
+  return { base, offset, prediction, features: attributions }
 }
 
 export function getFeatureImportance(): { name: string; importance: number }[] {

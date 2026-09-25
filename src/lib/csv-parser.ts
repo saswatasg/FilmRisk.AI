@@ -58,12 +58,24 @@ export function parseCSV(text: string): BollywoodFilm[] {
   if (lines.length < 2) return []
   const headers = parseCSVLine(lines[0]!).map(h => h.trim())
   const films: BollywoodFilm[] = []
+  const failures: { line: number; columns: number }[] = []
   for (let i = 1; i < lines.length; i++) {
     const values = parseCSVLine(lines[i]!)
-    if (values.length !== headers.length) continue
+    if (values.length !== headers.length) {
+      failures.push({ line: i + 1, columns: values.length })
+      continue
+    }
     const row: Record<string, string> = {}
     for (let j = 0; j < headers.length; j++) row[headers[j]!] = values[j]! ?? ''
     films.push(parseFilm(row))
+  }
+  if (failures.length > 0) {
+    const shown = failures.slice(0, 5).map(f => `line ${f.line} (${f.columns} cols, expected ${headers.length})`).join('; ')
+    throw new Error(
+      `CSV parse failure: ${failures.length} row(s) dropped due to column-count mismatch — ${shown}` +
+      (failures.length > 5 ? ` and ${failures.length - 5} more` : '') +
+      `. Fix the source CSV quoting; rows are never silently dropped.`
+    )
   }
   return cleanData(films)
 }

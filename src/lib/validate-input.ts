@@ -3,10 +3,7 @@ import type { DatasetStats } from './dataset-stats'
 
 export function validateInputBackend(input: EvaluationInput): string[] {
   const errors: string[] = []
-  if (!input.filmTitle?.trim()) errors.push('Film title is required')
-  if (!input.director?.trim()) errors.push('Director name is required')
-  if (!input.leadActor1?.trim()) errors.push('Lead actor name is required')
-  if (input.totalBudgetCr <= 0) errors.push('Total budget must be greater than 0')
+  if (!(input.totalBudgetCr > 0)) errors.push('Total budget must be greater than 0')
   return errors
 }
 
@@ -58,7 +55,7 @@ export function getDataQualityWarnings(input: EvaluationInput, stats?: DatasetSt
   if (stats) {
     const totalWithFinancial = Object.values(stats.genreStats).reduce((s: number, g: { count: number }) => s + g.count, 0)
     if (totalWithFinancial < 700) {
-      warnings.push('Only ~30% of films report financials — survivorship bias (real avg ~1.0× vs dataset 2.72×)')
+      warnings.push('Only ~30% of films report financials — survivorship bias (real market ~1.0× vs dataset median 1.21×)')
     }
   }
   if (input.totalBudgetCr >= 200) {

@@ -300,6 +300,56 @@ export function featureImportance(config: GBMConfig): { name: string; importance
   return counts.map((c, i) => ({ name: names[i]! ?? `f${i}`, importance: c / total })).sort((a, b) => b.importance - a.importance)
 }
 
+/* ───── Per-prediction path attribution ───── */
+
+export interface FeatureAttribution {
+  name: string
+  contribution: number
+}
+
+/*
+  Decomposes one GBM prediction into per-feature contributions by walking each
+  tree's prediction path: at every split on the path, (child.value − node.value)
+  is attributed to the split feature. Exact identity (up to float rounding):
+    prediction = base + offset + Σ contributions
+  where offset = lr × Σ tree-root values (the per-iteration sampling-mean
+  residual, unattributable to any single feature). Honest label: "path
+  attribution" — a lightweight TreeSHAP-style decomposition, not full SHAP.
+*/
+export function attributeGBM(config: GBMConfig, x: number[]): {
+  base: number
+  offset: number
+  prediction: number
+  attributions: FeatureAttribution[]
+} {
+  const xnorm = x.map((v, i) => (v - config.featureMeans[i]!) / config.featureStds[i]!)
+  const names = extractFeatureNames()
+  const sums: number[] = new Array(names.length).fill(0)
+  let rootSum = 0
+
+  for (const tree of config.trees) {
+    rootSum += tree.value
+    let node = tree
+    while (!node.isLeaf) {
+      const child = xnorm[node.feature]! < node.threshold ? node.left! : node.right!
+      sums[node.feature]! += child.value - node.value
+      node = child
+    }
+  }
+
+  const lr = config.params.learningRate
+  const attributions = names.map((name, i) => ({
+    name,
+    contribution: Math.round(sums[i]! * lr * 10000) / 10000,
+  }))
+  return {
+    base: config.basePrediction,
+    offset: Math.round(rootSum * lr * 10000) / 10000,
+    prediction: predictGBM(config, x),
+    attributions,
+  }
+}
+
 /* ───── Serialization ───── */
 
 export function serializeGBM(config: GBMConfig): string {

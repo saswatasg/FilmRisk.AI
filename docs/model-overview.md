@@ -18,30 +18,30 @@
 ## 2. Dataset
 
 ### Source
-- 2,209 Bollywood films (2001–2025) from IMDB, BollywoodMovieDetail, and Bollywood Movies Dataset exports
+- 2,454 Bollywood films (2001–2025); lineage: compiled from Wikipedia-sourced film pages (see `docs/data-provenance.md`)
 - Cleaned to 19 columns: identifiers, release metadata, genre flags, cast/crew ranks, budget/gross, verdict
-- **All 2,209 rows parse correctly** (no dropped rows — fixed quoting in CSV generation)
+- **All 2,454 rows parse correctly** (no dropped rows — hard-fail parser, acceptance-tested by `npm run verify:pr1`)
 
 ### Financial Subset
-- **679 films** have both budget AND gross (>0) — the full-finance core for ML training
-- **59 budget-only** + **64 gross-only** = **105 imputed** via budget-band median multiples at load time (used for stats/UI only)
+- **729 films** have both budget AND gross (>0) — the full-finance core for ML training
+- **79 budget-only** + **157 gross-only** = **236 imputed** via budget-band median multiples at load time (used for stats/UI only)
 - **Imputed rows are excluded from ML training** (tagged `is_imputed_finance: true`) — their targets are deterministic (band median), so training on them would just learn the band median and inflate metrics
 
 ### Imputation Strategy (`src/lib/impute-finance.ts`)
 Budget-band median multiple imputation:
 1. Compute median gross-multiple per budget band from full-finance films
 2. Budget-only → `imputed_gross = budget × band_median`
-3. Gross-only → `imputed_budget = gross / band_median` (with band-consistency check)
+3. Gross-only → `imputed_budget = gross / band_median` (with band-consistency check and fallback match)
 
-| Band | Full n | Median Multiple |
-|------|--------|-----------------|
-| <10 Cr | 74 | 0.26× |
-| 10–30 Cr | 179 | 0.54× |
-| 30–60 Cr | 134 | 1.33× |
-| 60–100 Cr | 81 | 2.01× |
-| 100–200 Cr | 120 | 2.83× |
-| 200–300 Cr | 85 | 3.38× |
-| >300 Cr | 6 | 3.01× |
+| Band | Full n | Median Raw Multiple |
+|------|--------|---------------------|
+| <10 Cr | 111 | 0.71× |
+| 10–30 Cr | 262 | 1.00× |
+| 30–60 Cr | 181 | 1.43× |
+| 60–100 Cr | 94 | 1.43× |
+| 100–200 Cr | 62 | 1.37× |
+| 200–300 Cr | 11 | 0.96× |
+| >300 Cr | 8 | 1.22× |
 
 ### Data Quality
 - `financial_data_confidence` (High/Low/Missing-Partial) available as row-weighting signal (not currently wired in training)
@@ -56,16 +56,28 @@ Two models, ensemble-averaged at inference time:
 
 **Implementation**: Hand-rolled GBM with trees learned via CART regression on residuals, L2 regularization, and bagging.
 
-**Feature Vector** (9-dimensional, sparse one-hot genre flags removed — Bayesian model owns genre):
-1. `budget_scaled` — log-index into [1, 3, 5, 10, 15, 25, 40, 60, 80, 110, 150, 200, 300] Cr
-2. `actor_tier` — S/A/B/C/D → 0–1
-3. `director_tier` — S/A/B/C/D → 0–1
-4. `actor_rank` — normalized actor rank score (0–1), imputed from tier when null
-5. `director_rank` — normalized director rank score (0–1), imputed from tier when null
-6. `rank_availability` — how many of the two rank scores are non-null (0, 0.5, 1.0)
-7. `sequel_flag` — binary
-8. `month_sin` — circular encoding of release month
-9. `month_cos` — circular encoding of release month
+**Feature Vector — CANONICAL SPEC** (9-dimensional, sparse one-hot genre flags removed — Bayesian model owns genre).
+This table is the single canonical feature list: it is cross-checked against `extractFeatureNames()`
+by `scripts/verify-features.ts` (`npm run verify:pr3`). No other feature spec exists in this repo.
+
+| # | Feature | Encoding | Notes |
+|---|---------|---------|-------|
+| 1 | `budget_scaled` | budget-index into [1, 3, 5, 10, 15, 25, 40, 60, 80, 110, 150, 200, 300] Cr, / 13 | ordinal index, not log |
+| 2 | `actor_tier` | S=4, A=3, B=2, C=1, D=0 → /4 | ordinal |
+| 3 | `director_tier` | same → /4 | ordinal |
+| 4 | `actor_rank` | rank score / 100 (0 if null) | |
+| 5 | `director_rank` | rank score / 100 (0 if null) | |
+| 6 | `rank_availability` | (# non-null rank scores) / 2 | |
+| 7 | `sequel_flag` | binary | |
+| 8 | `month_sin` | sin(2π·month/12) | circular encoding |
+| 9 | `month_cos` | cos(2π·month/12) | circular encoding |
+
+**Leakage policy — no target encoding by construction.** Every feature is derived from the
+film's own row (budget, tiers, ranks, sequel flag, month) using fixed transformations. No
+feature consumes dataset aggregates, win rates, or target statistics; genre is excluded from
+the GBM precisely so no per-category target encoding exists (out-of-fold encoding is therefore
+not required). Walk-forward folds additionally retrain stats and models per fold on strictly
+earlier years (asserted by `verify:pr1`/`verify:pr3`).
 
 **Hyperparameters**: tuned via 3-fold time-series CV (train≤2014/test2015-2017, train≤2017/test2018-2020, train≤2020/test2021-2023):
 
@@ -110,25 +122,29 @@ Both models are trained once at server startup (`dataset-loader.ts`) on the full
 
 ### 4.1 Component Weights
 
+Weights below are the implementation values (`scoring-engine.ts` `W`/`FW`) — docs follow code.
+
 | Component | Producer Weight | Financier Weight |
 |-----------|:--------------:|:----------------:|
-| Genre Viability | 12% | 11% |
-| Genre-Budget Fit | 6% | 7% |
-| Budget Feasibility | 14% | 14% |
-| Talent Strength | 17% | 13% |
-| Pre-Sale Coverage | 22% | 24% |
-| Production House | 4% | 4% |
-| Concept Quality | 10% | 10% |
-| Market Timing | 8% | 7% |
-| Seasonality | 3% | 4% |
-| Production Viability | 4% | 6% |
+| Genre Viability | 14% | 13% (as Genre Risk) |
+| Genre-Budget Fit | 7% | 8% (as Genre-Budget Risk) |
+| Budget Feasibility | 16% | 16% (as Budget Risk) |
+| Talent Strength | 20% | 15% (as Talent Liquidity) |
+| Pre-Sale Coverage | 12% | 20% (as Capital Recovery) |
+| Production House | 5% | 4% (as Production House Risk) |
+| Concept Quality | 10% | 10% (as Concept Risk) |
+| Market Timing | 6% | 4% |
+| Seasonality | 5% | 4% (as Seasonality Risk) |
+| Production Viability | 3% | 4% (as Production Risk) |
+| Market Sentiment | 2% | 2% |
+| **Total** | **100%** | **100%** |
 
 ### 4.2 Scoring Method
-Each component scores by expected gross multiple (continuous outcome model, not binary win-rate):
+Each component scores by expected **break-even-normalized** multiple (continuous outcome model, not binary win-rate):
 ```
 score = min(multiple / cap, 1) × 10
 ```
-Caps vary by component (genre=3.0×, budget=3.0×, talent=3.0×). Normalized multiples > cap are truncated.
+All dataset-backed components use cap = 3.0× normalized. Normalized multiples > cap are truncated. Small samples (<10 films) are shrunk toward priors; a Bayesian posterior mean replaces the shrinkage blend when available.
 
 ### 4.3 ML Blend
 The scoring-engine uses a weighted average of the evidence-based score and the ML ensemble:
@@ -139,27 +155,27 @@ adjustedScore = 0.6 × evidenceScore + 0.4 × mlScore
 - `mlScore` = mapped to 0–100 scale via `min(mlPrediction / 0.3, 100)`
 
 ### 4.4 Percentile Mapping
-Scores are mapped to market percentiles via data-driven buckets computed from the training set:
+Scores are mapped to market percentiles via data-driven buckets computed from the training set (`src/lib/config.ts`):
 ```
 PERCENTILE_BUCKETS = [
-  [38.3, 98], [36.4, 95], [35.4, 90], [33.9, 82], [31.7, 72],
-  [28.5, 60], [26.8, 48], [25.6, 38], [24.7, 28], [24.3, 18],
-  [23.8, 10], [23.7, 5],
+  [27.3, 98], [25.5, 95], [24.8, 90], [24.0, 82], [23.5, 72],
+  [22.7, 60], [21.9, 48], [21.2, 38], [20.7, 28], [19.8, 18],
+  [18.9, 10], [18.0, 5],
 ]
 ```
 
 ### 4.5 Verdict Thresholds
-Percentile thresholds per budget band (tuned via grid search on 75-25 split):
+Percentile thresholds per budget band (`BASE_PCT_THRESHOLDS` in `src/lib/config.ts`; recalibrate via `npm run calibrate`):
 
 | Band | Greenlight | Conditional |
 |------|:----------:|:-----------:|
-| <10 Cr | ≥51% | ≥21% |
-| 10–30 Cr | ≥51% | ≥21% |
-| 30–60 Cr | ≥56% | ≥26% |
-| 60–100 Cr | ≥61% | ≥31% |
-| 100–200 Cr | ≥66% | ≥36% |
-| 200–300 Cr | ≥71% | ≥41% |
-| >300 Cr | ≥76% | ≥46% |
+| <10 Cr | ≥50% | ≥20% |
+| 10–30 Cr | ≥50% | ≥20% |
+| 30–60 Cr | ≥55% | ≥25% |
+| 60–100 Cr | ≥60% | ≥30% |
+| 100–200 Cr | ≥65% | ≥35% |
+| 200–300 Cr | ≥70% | ≥40% |
+| >300 Cr | ≥75% | ≥45% |
 
 ### 4.6 Normalization ↔ Verdict Threshold Interaction
 
@@ -218,10 +234,10 @@ normalizedMultiple(grossMultiple, budget, undefined, 0.45)  // uses user-supplie
 ```
 
 ### 5.3 Target Distribution
-On the 679 full-finance films with era-aware break-even:
-- **Median normalized multiple**: 0.567
-- **std(log(normalized))**: 1.536 (matches `BASE_SIGMA = 1.55`)
-- **Class split**: 13% blockbuster / 8% hit / 13% break-even / 21% below-avg / 47% flop
+On the 729 full-finance films with era-aware break-even (current dataset):
+- **Median normalized multiple**: 0.415
+- **std(log(normalized)) = 1.554** — matches the calibrated `BASE_SIGMA = 1.55` (VERIFIED fixture; band-level `BAND_SIGMA` calibrated from the same residuals)
+- **Class split**: 6.0% blockbuster / 5.3% hit / 8.6% break-even / 22.4% below-avg / 57.6% flop (<0.5× normalized); 80.0% of films land below 1.0× normalized
 
 Pre-2015 films shift downward (no longer inflated by high rights assumptions), while post-2022 films remain on the mature-era baseline.
 
@@ -230,65 +246,90 @@ The Pre-Sale Coverage component (22% weight) in the scoring engine is **user-inp
 
 ## 6. Evaluation
 
+Numbers below are generated by `npm run benchmark` (walk-forward) and `npm run benchmark:75-25`
+(appendix), and stored in `src/generated/benchmark-results.json` / `benchmark-75-25.json`.
+Buyer-facing surfaces carry no performance figures (positioning policy); the fixtures and this
+section are the engineering record.
+
+Backtest inputs use neutral concept scores (clarity 6, novelty 5) for every film — the CSV
+contains no content scores, and deriving sliders from verdicts leaked test outcomes into test
+inputs. The walk-forward therefore measures the data-driven core only; production evaluations
+add real user concept + pre-sale inputs whose variance is unobservable in backtests.
+
 ### 6.1 Forward-Chaining Walk-Forward (Primary Benchmark)
-Train on ≤Y, test on Y+1, rolling from 2010–2025. Uses **full engine** (ML blend + Bayesian + scoring components). This is the headline metric — it reflects realistic generalization to unseen future years.
+Train on <Y, test on Y, rolling 2010–2025. Uses **full engine** (ML blend + Bayesian + scoring components). This is the headline metric.
 
 | Metric | Value [95% CI] |
 |--------|---------------|
-| Accuracy | 39.4% [35.6%, 43.3%] |
-| Greenlight Precision | 28.7% [22.8%, 35.4%] |
-| Greenlight Recall | 48.3% |
-| F1 Score | 36.0% |
-| Always-Flop Baseline | 67.2% |
-| Total Films | 619 (12 folds) |
+| Accuracy | 29.3% [26.0%, 32.9%] |
+| Greenlight Precision | 11.3% [6.8%, 18.1%] |
+| Greenlight Recall | 18.7% [11.5%, 28.9%] |
+| F1 Score | 14.1% [7.9%, 20.1%] |
+| Greenlight Calls | 124/658 (14 hits of 75 total) |
+| Total Films | 658 (14 folds) |
 
-**Year-by-year detail:**
+Naive baselines (same folds, same scoring rule):
+| Baseline | Value |
+|----------|-------|
+| Always-flop accuracy | 80.5% |
+| Band-median-multiple accuracy | 63.7% |
+| GBM RMSE (normalized multiple) | 1.303 vs band-median RMSE 1.230 |
+| Train hit-rate prevalence | 11.0% |
+
+Reading the results honestly:
+- Precision (11.9%) sits at the 11% base rate: on data-driven signal alone the engine barely ranks hits above flops. The pre-fix 21.8% was inflated by perfect-foresight concept sliders.
+- The threshold sweep (−15…+20) proves precision is flat (~9–14%) at every operating point — no threshold manufactures precision. Base `BASE_PCT_THRESHOLDS` are retained: with precision flat, thresholds only trade accuracy against recall, and base preserves the most recall (33.3%).
+- Rejected without effect or on principle: confidence sample-weights (all 729 trainable films are High confidence — zero variance), isotonic calibration (flat discrimination maps everything to the base rate; percentile-rank framing is already honest), blend reweighting (do-not-reargue item), per-band tuning (overfit risk).
+
+**Year-by-year detail** (from the regenerated fixture; early/thin and regime-break folds are noisy):
 | Year | n | Acc | Prec | Rec | F1 | GL calls(hits) |
 |------|---|:---:|:----:|:---:|:--:|:--------------:|
-| 2014 | 14 | 50.0% | 46.2% | 100% | 63.2% | 13(6) |
-| 2015 | 76 | 13.2% | 8.7% | 85.7% | 15.8% | 69(6) |
-| 2016 | 88 | 22.7% | 8.0% | 25.0% | 12.1% | 25(2) |
-| 2017 | 103 | 43.7% | 20.0% | 20.0% | 20.0% | 10(2) |
-| 2018 | 97 | 48.5% | 36.4% | 28.6% | 32.0% | 11(4) |
-| 2019 | 85 | 50.6% | 83.3% | 35.7% | 50.0% | 6(5) |
-| 2020 | 50 | 54.0% | 50.0% | 33.3% | 40.0% | 6(3) |
-| 2021 | 39 | 38.5% | 33.3% | 30.0% | 31.6% | 9(3) |
-| 2022 | 19 | 63.2% | 70.0% | 70.0% | 70.0% | 10(7) |
-| 2023 | 17 | 35.3% | 42.9% | 66.7% | 52.2% | 14(6) |
-| 2024 | 16 | 25.0% | 50.0% | 40.0% | 44.4% | 8(4) |
-| 2025 | 15 | 53.3% | 57.1% | 88.9% | 69.6% | 14(8) |
+| 2012 | 40 | 50.0% | 0.0% | 0.0% | 0.0% | 0(0) |
+| 2013 | 43 | 41.9% | 25.0% | 20.0% | 22.2% | 4(1) |
+| 2014 | 52 | 36.5% | 33.3% | 25.0% | 28.6% | 3(1) |
+| 2015 | 49 | 36.7% | 0.0% | 0.0% | 0.0% | 2(0) |
+| 2016 | 68 | 26.5% | 0.0% | 0.0% | 0.0% | 3(0) |
+| 2017 | 74 | 37.8% | 22.2% | 28.6% | 25.0% | 9(2) |
+| 2018 | 75 | 22.7% | 8.3% | 10.0% | 9.1% | 12(1) |
+| 2019 | 68 | 22.1% | 18.2% | 22.2% | 20.0% | 11(2) |
+| 2020 | 33 | 27.3% | 0.0% | 0.0% | 0.0% | 10(0) |
+| 2021 | 22 | 22.7% | 0.0% | 0.0% | 0.0% | 8(0) |
+| 2022 | 32 | 6.3% | 0.0% | 0.0% | 0.0% | 18(0) |
+| 2023 | 33 | 27.3% | 25.0% | 25.0% | 25.0% | 8(2) |
+| 2024 | 32 | 15.6% | 12.5% | 50.0% | 20.0% | 16(2) |
+| 2025 | 37 | 27.0% | 15.0% | 60.0% | 24.0% | 20(3) |
 
-### 6.2 75-25 Random Split (Secondary — In-Distribution Upper Bound)
-For reference only. Random splitting leaks future data into training, inflating metrics. This is the upper bound achievable in an in-distribution setting.
+### 6.2 75-25 Random Split (Appendix — NOT a Headline)
+Reference only. Random splitting leaks future films into training.
 
 | Metric | Value |
 |--------|-------|
-| Accuracy | 67.9% |
-| Greenlight Precision | 57.7% |
-| Greenlight Recall | 71.4% |
-| F1 Score | 63.8% |
-| Test n | 196 |
+| Accuracy | 30.1% [23.9%, 37.1%] |
+| Greenlight Precision | 23.5% [12.4%, 40.0%] |
+| Greenlight Recall | 42.1% [23.1%, 63.7%] |
+| F1 Score | 30.2% |
+| Test n | 183 |
 
 ### 6.3 Confidence Intervals
-All proportion-based metrics (accuracy, precision, recall) use **Wilson score intervals** with z=1.96. Continuous metrics (Spearman rank correlation, Brier score) use **seeded bootstrap** (Mulberry32, 1000 resamples, α=0.05). Implemented in `src/lib/confidence-interval.ts`.
+All proportion-based metrics (accuracy, precision, recall) use **Wilson score intervals** with z=1.96. F1 uses **seeded bootstrap** (Mulberry32, seed 42, 1000 resamples, α=0.05). Implemented in `src/lib/confidence-interval.ts`.
 
 ## 7. Key Assumptions & Limitations
 
-1. **Survivorship bias**: Dataset only includes films with reported budget+gross (679/2209). These skew toward higher-budget, better-tracked releases. Era-aware break-even normalization partially mitigates this but does not eliminate it.
+1. **Survivorship bias**: Dataset only includes films with reported budget+gross (729/2454). These skew toward higher-budget, better-tracked releases. Era-aware break-even normalization partially mitigates this but does not eliminate it.
 
-2. **Pre-sale estimation (training)**: The break-even normalization for training uses era-estimated rights coverage with no actual deal data. The scoring engine's Pre-Sale Coverage component (22% weight) is user-input only.
+2. **Pre-sale estimation (training)**: The break-even normalization for training uses era-estimated rights coverage with no actual deal data. The scoring engine's Pre-Sale Coverage component (12% weight) is user-input only.
 
 3. **Empty content scores**: All 8 appeal-score columns (concept_clarity, novelty, etc.) are empty. User sliders in evaluation UI are the only source.
 
 4. **Tier system**: `actor_tier_proxy` and `director_tier_proxy` are pre-computed black boxes with undocumented methodology.
 
-5. **Imputation for stats only**: 105 imputed rows are used for dataset stats (genre/tier/band averages) but excluded from ML training (target would be deterministic).
+5. **Imputation for stats only**: 236 imputed rows are used for dataset stats (genre/tier/band averages) but excluded from ML training (target would be deterministic).
 
-6. **Small high-budget sample**: Only 6 films >300 Cr with full finance. Statistical confidence is low for this band.
+6. **Small high-budget sample**: Only 8 films >300 Cr with full finance. Statistical confidence is low for this band.
 
 7. **Time drift**: Models train on 2001–2025 data but deploy on future films. Market dynamics (OTT rise, COVID recovery, star-power decline) are partially captured by era-aware break-even but not by the model itself.
 
-8. **No log-space GBM target**: The GBM is fit on raw normalized multiple, not log(normalized). This makes it sensitive to outliers. Fitting in log-space could improve Spearman/Brier but is deferred.
+8. **No log-space GBM target**: The GBM is fit on raw normalized multiple, not log(normalized). This makes it sensitive to outliers. Fitting in log-space was tried and reverted (walk-forward accuracy dropped) — raw-space retained.
 
 ## 8. Files
 

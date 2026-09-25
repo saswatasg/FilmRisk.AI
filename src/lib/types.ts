@@ -23,15 +23,15 @@ export interface BollywoodFilm {
 }
 
 export interface EvaluationInput {
-  filmTitle: string
+  filmTitle?: string
   primaryGenre: string
   secondaryGenre: string
   sequelFlag: boolean
-  logline: string
+  logline?: string
   conceptClarity: number
   novelty: number
-  director: string
-  leadActor1: string
+  director?: string
+  leadActor1?: string
   directorTier: string
   actorTier: string
   productionHouse: string
@@ -75,6 +75,12 @@ export interface GreenlightScoreResult {
   confidence: 'high' | 'medium' | 'low'
   confidenceInterval: { lower: number; upper: number }
   narrativeSummary: string
+  mlAttribution: {
+    prediction: number
+    base: number
+    offset: number
+    features: { name: string; contribution: number }[]
+  } | null
 }
 
 export interface FinancierRiskResult {
@@ -147,6 +153,12 @@ export interface SensitivityItem {
   description: string
 }
 
+export interface ImmaterialMove {
+  label: string
+  detail: string
+  gain: number
+}
+
 export interface PreSaleBenchmark {
   category: string
   userValue: number
@@ -185,6 +197,7 @@ export interface EvaluationResult {
   financialProjection: FinancialProjection
   riskDiagnosis: RiskDiagnosis
   sensitivities: SensitivityItem[]
+  insensitiveLevers: ImmaterialMove[]
   preSaleBenchmarks: PreSaleBenchmark[]
   validationErrors: string[]
   dataQualityWarnings: string[]

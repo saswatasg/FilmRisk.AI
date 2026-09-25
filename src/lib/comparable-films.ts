@@ -11,7 +11,7 @@ const WEIGHTS = {
   directorScore: 0.05,
 }
 
-const TIER_RANK: Record<string, number> = { A: 4, B: 3, C: 2, D: 1 }
+const TIER_RANK: Record<string, number> = { S: 5, A: 4, B: 3, C: 2, D: 1 }
 
 export function findComparableFilms(
   input: EvaluationInput,
@@ -114,13 +114,17 @@ function yearRecency(year: number | null): number {
 }
 
 function actorScoreSimilarity(input: EvaluationInput, film: BollywoodFilm): number {
-  if (input.leadActor1.toLowerCase() === film.lead_actor_1?.toLowerCase()) return 1
-  if (input.leadActor1.toLowerCase() === film.lead_actor_2?.toLowerCase()) return 0.7
+  const name = input.leadActor1?.trim().toLowerCase()
+  if (!name) return 0
+  if (name === film.lead_actor_1?.toLowerCase()) return 1
+  if (name === film.lead_actor_2?.toLowerCase()) return 0.7
   return 0
 }
 
 function dirScoreSimilarity(input: EvaluationInput, film: BollywoodFilm): number {
-  return input.director.toLowerCase() === film.director?.toLowerCase() ? 1 : 0
+  const name = input.director?.trim().toLowerCase()
+  if (!name) return 0
+  return name === film.director?.toLowerCase() ? 1 : 0
 }
 
 

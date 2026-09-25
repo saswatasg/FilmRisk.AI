@@ -1,453 +1,277 @@
 import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, BarChart3, ShieldCheck, TrendingUp, Film, Database, Star, ChevronDown, Sparkles } from 'lucide-react'
+import { Reveal } from './reveal'
+import { ArrowUpRight } from 'lucide-react'
 
-const stats = [
-  { value: '700+', label: 'Films with verified financials' },
-  { value: '93.3%', label: 'Greenlight precision rate' },
-  { value: '10', label: 'Scoring dimensions' },
-  { value: '₹13,395 Cr', label: '2025 Indian box office' },
-]
-
-const features = [
-  {
-    icon: <BarChart3 className="size-6" />,
-    title: 'Greenlight Score',
-    desc: '10-component weighted model scoring genre, talent, budget, pre-sales, and seasonality.',
-    gradient: 'from-emerald-600/20 to-emerald-800/5',
-    border: 'border-emerald-500/20',
-    iconBg: 'bg-emerald-500/20',
-    iconColor: 'text-emerald-400',
-  },
-  {
-    icon: <ShieldCheck className="size-6" />,
-    title: 'Risk Assessment',
-    desc: 'Capital recovery probability with weighted severity scoring and confidence intervals.',
-    gradient: 'from-blue-600/20 to-blue-800/5',
-    border: 'border-blue-500/20',
-    iconBg: 'bg-blue-500/20',
-    iconColor: 'text-blue-400',
-  },
-  {
-    icon: <TrendingUp className="size-6" />,
-    title: 'ROI Scenarios',
-    desc: 'Pessimistic, base, and optimistic projections with break-even multiples and sensitivity.',
-    gradient: 'from-amber-600/20 to-amber-800/5',
-    border: 'border-amber-500/20',
-    iconBg: 'bg-amber-500/20',
-    iconColor: 'text-amber-400',
-  },
-  {
-    icon: <Film className="size-6" />,
-    title: 'Comparables',
-    desc: 'Multi-dimensional similarity search across genre, budget, talent tiers, and recency.',
-    gradient: 'from-purple-600/20 to-purple-800/5',
-    border: 'border-purple-500/20',
-    iconBg: 'bg-purple-500/20',
-    iconColor: 'text-purple-400',
-  },
-  {
-    icon: <Database className="size-6" />,
-    title: 'Benchmarks',
-    desc: 'Pre-sale market ranges, genre appetite trajectory, and production house track records.',
-    gradient: 'from-cyan-600/20 to-cyan-800/5',
-    border: 'border-cyan-500/20',
-    iconBg: 'bg-cyan-500/20',
-    iconColor: 'text-cyan-400',
-  },
-]
-
-const testimonials = [
-  { quote: 'The greenlight score has become our go-to sanity check before backing any project. It catches blind spots we routinely miss.', name: 'Amit Shah', role: 'Producer, Maddock Films' },
-  { quote: 'Finally, a tool that quantifies what we used to call gut feeling. The confidence intervals alone are worth the price of admission.', name: 'Vikram Mehra', role: 'Head of Content, Zee Studios' },
-  { quote: 'We ran 20 past projects through it. It flagged our three flops with 80%+ accuracy. That\'s better than our internal team.', name: 'Karan Desai', role: 'Financier, Eros International' },
-  { quote: 'The pre-sale benchmarking opened my eyes to what we were leaving on the table. Unrealized value, plain and simple.', name: 'Priya Sharma', role: 'Distribution Head, PVR Pictures' },
-  { quote: 'Walk-forward validation is what sets this apart. Not a backtest — an honest out-of-sample test. I trust the numbers.', name: 'Rajeev Jain', role: 'Investment Analyst, Multiples PE' },
-  { quote: 'My favourite feature is the sensitivity analysis. In two clicks I know which lever moves the needle most.', name: 'Ankit Bansal', role: 'Producer, RSVP Movies' },
+const scope = [
+  { v: '2,454', l: 'Bollywood films, 2001–2025' },
+  { v: '729', l: 'With verified budgets and grosses' },
+  { v: '658', l: 'Films tested out-of-sample' },
+  { v: '14', l: 'Rolling validation folds' },
 ]
 
 const faqs = [
-  { q: 'How accurate is the greenlight model?', a: 'Our continuous outcome model achieves 93.3% precision and 51.9% recall on out-of-sample films (2023–2025). This means when it says greenlight, it is right 93% of the time. The model is validated via walk-forward backtesting across 15 annual windows.' },
-  { q: 'What data does the scoring engine use?', a: 'We maintain a dataset of 700+ Bollywood films with verified financials spanning 2015–2025. Each film includes budget, box office, talent tiers, production houses, genre data, and release timing. Every component score is derived from the empirical distribution of gross multiples in this dataset.' },
-  { q: 'How are pre-sale rights estimated?', a: 'Pre-sale data is user-provided, not from our dataset. The scoring engine benchmarks your inputs against market ranges per budget band (e.g., OTT typically runs 40–60% of budget for strong projects). The backtest estimates pre-sale from budget when actual data is absent.' },
-  { q: 'What is the continuous outcome model?', a: 'Unlike binary models that predict win/loss, our continuous model scores each component by expected gross multiple — the average box office return relative to budget. Components are capped at a multiple of 3.5–4.0 and mapped to a 1–10 score. This catches partial successes that binary models miss, improving recall from 22% to 52%.' },
-  { q: 'Who is this built for — producers or financiers?', a: 'Both. The producer view emphasizes greenlight viability, genre compatibility, and comparable films. The financier view weights capital recovery, risk diagnosis, and downside scenarios. Each role gets a tailored scorecard from the same underlying model, just with different component weights.' },
-  { q: 'How do you handle survivorship bias?', a: 'Only ~30% of Bollywood films report financial data — the ones that do tend to be more successful (dataset average multiple 2.72x vs real market ~1.0x). Our walk-forward backtest adjusts for this by using break-even-anchored normalization: every component score is computed relative to the break-even multiple within its category, not absolute returns. The methodology footnote in every report discloses the bias and its impact on interpretability.' },
+  {
+    q: 'What do I receive at the end?',
+    a: 'A one-page investment memorandum: the verdict on a green–amber–red gauge with your market percentile, the split between dataset evidence and your own assumptions, simulated outcome ranges, comparable films, diagnosed risks, and what-if levers — downloadable as a PDF to share with partners.',
+  },
+  {
+    q: 'What does it need from me?',
+    a: 'The project details, your expected pre-sale deals by category, and your honest ratings of the concept. Pre-sale figures and story quality exist nowhere in our data — they are your inputs, benchmarked against market ranges, and the report always shows how much of the score is your assumptions versus historical evidence.',
+  },
+  {
+    q: 'How do you handle the fact that most films never publish numbers?',
+    a: 'Openly. Only about three in ten films report financials, and the ones that do skew successful. We judge every film against the break-even economics of its own era, and every report carries the caveat. Survivorship bias is disclosed, not corrected away.',
+  },
+  {
+    q: 'Who is it for?',
+    a: 'Producers weighing a greenlight and financiers weighing capital at risk. Same model, two scorecards: the producer view weights viability and comparables; the financier view weights recovery probability, downside scenarios, and risk diagnosis.',
+  },
 ]
 
 export default function Home() {
   return (
     <div className="flex flex-1 flex-col">
-      {/* ───────── Hero ───────── */}
-      <section className="relative min-h-screen flex items-center justify-center overflow-hidden bg-black">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,rgba(16,185,129,0.12),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_70%_80%,rgba(6,182,212,0.08),transparent_60%)]" />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.03)_1px,transparent_1px)] bg-[size:60px_60px]" />
-        <div className="absolute -bottom-40 -right-40 size-[500px] rounded-full bg-emerald-500/10 blur-3xl animate-float" />
-        <div className="absolute -top-40 -left-40 size-[400px] rounded-full bg-cyan-500/5 blur-3xl animate-float" style={{ animationDelay: '-3s' }} />
-
-        <div className="relative mx-auto flex max-w-4xl flex-col items-center gap-6 px-6 text-center">
-          <Badge variant="outline" className="border-white/10 text-xs text-white/60">
-            <Sparkles className="size-3 mr-1" />
-            Film Investment Intelligence
-          </Badge>
-          <h1 className="text-4xl font-bold leading-tight tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Make data-driven
-            <br />
-            <span className="font-serif-accent text-5xl sm:text-6xl lg:text-7xl">Film Investment</span>
-            <br />
-            decisions
-          </h1>
-          <p className="max-w-2xl text-base text-white/50 sm:text-lg">
-            Evaluate greenlight viability, assess financier risk, and simulate returns using a
-            continuous outcome model trained on 700+ Bollywood films with verified financials.
-          </p>
-          <div className="flex gap-4 pt-2">
-            <Link href="/evaluate">
-              <Button size="lg" className="rounded-full bg-white px-8 text-base text-black hover:bg-white/90">
-                Start Evaluation
-                <ArrowRight className="ml-1 size-4" />
-              </Button>
-            </Link>
-
-          </div>
+      {/* ── Cinematic hero ── */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0" aria-hidden>
+          <div className="absolute inset-0 bg-[#181818]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_0%,rgba(255,255,255,0.09),transparent_55%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_80%_100%,rgba(218,41,28,0.10),transparent_50%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,transparent_55%,#181818_100%)]" />
         </div>
-      </section>
-
-      {/* ───────── Stats ───────── */}
-      <section className="bg-zinc-950 border-y border-white/5">
-        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-6 px-6 py-12 sm:grid-cols-4">
-          {stats.map(s => (
-            <div key={s.label} className="text-center">
-              <p className="text-2xl font-bold tracking-tight text-white sm:text-3xl">{s.value}</p>
-              <p className="mt-1 text-xs text-white/40">{s.label}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ───────── Horizontal Scroll Features ───────── */}
-      <section className="bg-black py-20 sm:py-28">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="mb-10 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Everything you need to <span className="font-serif-accent">decide</span>
-            </h2>
-            <p className="mt-2 text-sm text-white/40">
-              Scroll through the full feature set
+        <div className="relative mx-auto w-full max-w-[1280px] px-6 pb-24 pt-24 sm:pb-32 sm:pt-32">
+          <Reveal>
+            <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#8f8f8f]">
+              Film investment intelligence
             </p>
-          </div>
-
-          <div className="scrollbar-hide -mx-6 flex snap-x snap-mandatory gap-5 overflow-x-auto px-6 pb-4">
-            {features.map(f => (
-              <div
-                key={f.title}
-                className={`bg-gradient-to-br ${f.gradient} ${f.border} flex w-[280px] shrink-0 snap-start flex-col gap-4 rounded-2xl border p-6 sm:w-[320px]`}
+            <h1 className="mt-6 max-w-3xl text-[48px] font-medium leading-[1.05] tracking-[-1.6px] text-white sm:text-[88px]">
+              Know whether a film pays, before it shoots.
+            </h1>
+            <p className="mt-6 max-w-xl text-[16px] leading-relaxed text-[#969696]">
+              Greenlit scores a project against twenty-five years of Bollywood outcomes —
+              genre, talent, budget, pre-sales, timing — and returns a memorandum you can
+              argue with: verdict, outcome ranges, comparables, risk factors, and the levers
+              that move the score.
+            </p>
+            <div className="mt-10 flex flex-wrap items-center gap-4">
+              <Link href="/evaluate">
+                <Button className="h-12 rounded-none bg-[#da291c] px-8 text-[14px] font-bold uppercase tracking-[1.4px] text-white transition-all duration-200 hover:bg-[#b01e0a] hover:shadow-[0_0_28px_rgba(218,41,28,0.35)] active:bg-[#b01e0a]">
+                  Evaluate a project
+                </Button>
+              </Link>
+              <a
+                href="#standard"
+                className="inline-flex h-12 items-center border border-white/40 px-8 text-[14px] font-bold uppercase tracking-[1.4px] text-white transition-colors hover:border-white"
               >
-                <div className={`${f.iconBg} ${f.iconColor} flex size-10 items-center justify-center rounded-lg`}>
-                  {f.icon}
-                </div>
+                The standard
+              </a>
+            </div>
+            <ul aria-label="Coverage highlights" className="mt-12 flex flex-wrap gap-2">
+              {[
+                '2,454 films · 2001–2025',
+                '729 verified financials',
+                '14 rolling validation folds',
+                '10 scoring dimensions',
+                '10,000 simulated paths',
+              ].map((b) => (
+                <li key={b}
+                  className="rounded-full border border-[#303030] bg-[#303030] px-3 py-1 text-[11px] font-semibold uppercase tracking-[1.1px] text-white">
+                  {b}
+                </li>
+              ))}
+             </ul>
+           </Reveal>
+          <Reveal delay={150}>
+          <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-12 border-t border-[#303030] pt-12 sm:grid-cols-4">
+            {scope.map(s => (
+              <div key={s.l}>
+                <dd className="text-[56px] font-bold leading-none tabular-nums tracking-[-1.12px] text-white">{s.v}</dd>
+                <dt className="mt-3 block text-[13px] leading-relaxed text-[#969696]">{s.l}</dt>
+              </div>
+            ))}
+          </dl>
+          </Reveal>
+        </div>
+      </section>
+
+      {/* ── The standard ── */}
+      <section id="standard" className="bg-white text-[#181818]" aria-label="The standard">
+        <div className="mx-auto max-w-[1280px] px-6 py-24">
+          <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#666]">The standard</p>
+          <h2 className="mt-4 max-w-2xl text-[40px] font-medium leading-[1.2] tracking-[-0.36px] sm:text-[52px]">
+            Institutional-grade film underwriting.
+          </h2>
+          <div className="mt-14 grid gap-px bg-[#303030] sm:grid-cols-3">
+            {[
+              { n: '01', t: 'Proven method', d: 'Walk-forward validation across fourteen rolling folds. The model trains strictly on films released before each test year and is retrained from scratch every time — never on the films it judges.' },
+              { n: '02', t: 'Financial-grade output', d: 'A memorandum, not a number. Verdict, market percentile, outcome ranges, comparable films, diagnosed risks, and what-if levers — each traced to its source, each with a sample size.' },
+              { n: '03', t: 'Disclosed uncertainty', d: 'Confidence intervals on every score, outcome ranges instead of point estimates, and an honest accounting of what the data cannot tell you. Survivorship bias is disclosed, not corrected away.' },
+            ].map((s, i) => (
+              <Reveal key={s.n} delay={i * 110}>
+              <div className="bg-[#181818] p-8 transition-colors duration-300 hover:bg-[#202020]">
+                <p className="flex items-center gap-2 text-[13px] font-semibold tabular-nums text-white"><span className="inline-block size-1.5 bg-[#da291c]" aria-hidden />{s.n}</p>
+                <h3 className="mt-4 text-[19px] font-bold leading-snug text-white">{s.t}</h3>
+                <p className="mt-2 text-[15px] leading-relaxed text-[#969696]">{s.d}</p>
+              </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── The memorandum ── */}
+      <section className="border-t border-[#303030]" aria-label="What you receive">
+        <div className="mx-auto max-w-[1280px] px-6 py-24">
+          <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#8f8f8f]">The memorandum</p>
+          <h2 className="mt-4 max-w-2xl text-[40px] font-medium leading-[1.2] tracking-[-0.36px] sm:text-[52px]">
+            One report you can hand a partner.
+          </h2>
+          <div className="mt-14 grid gap-10 sm:grid-cols-2">
+            {[
+              { l: 'Verdict', d: 'Greenlight, conditional, or do not invest — with the diagnosed risk level stated alongside.' },
+              { l: 'Market percentile', d: 'Where your project sits in the empirical distribution of scored films.' },
+              { l: 'Outcome ranges', d: 'Simulated 10,000-path projections instead of a single point estimate.' },
+              { l: 'Risk diagnosis', d: 'Every factor pulling the score down, with severity and what-if sensitivity.' },
+              { l: 'Comparables', d: 'Historically similar films with their outcomes — the raw record behind the ranking.' },
+              { l: 'Levers', d: 'Which inputs move the needle and by how much — what to test before you commit.' },
+            ].map((m, i) => (
+              <Reveal key={m.l} delay={i * 80}>
+              <div className="flex gap-4">
+                <span className="shrink-0 size-1.5 bg-[#da291c]" />
                 <div>
-                  <h3 className="text-sm font-semibold text-white">{f.title}</h3>
-                  <p className="mt-1.5 text-xs leading-relaxed text-white/50">{f.desc}</p>
+                  <p className="text-[16px] font-medium text-white">{m.l}</p>
+                  <p className="mt-1 text-[15px] leading-relaxed text-[#969696]">{m.d}</p>
                 </div>
               </div>
-            ))}
-          </div>
-
-          <div className="mt-6 flex items-center justify-center gap-2">
-            {features.map((_, idx) => (
-              <div key={idx} className={`size-1.5 rounded-full ${idx === 0 ? 'bg-white/60' : 'bg-white/20'}`} />
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ───────── Value Prop 1 — Two perspectives ───────── */}
-      <section className="border-y border-white/5 bg-zinc-950 py-20 sm:py-28">
-        <div className="mx-auto grid max-w-5xl items-center gap-12 px-6 lg:grid-cols-2">
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Two perspectives,{' '}
-              <span className="font-serif-accent">one platform</span>
-            </h2>
-            <p className="mt-4 text-sm leading-relaxed text-white/50">
-              Producers and financiers each get views tailored to their decisions. The producer
-              greenlight score weights genre viability and talent strength; the financier view
-              emphasizes capital recovery and downside protection.
-            </p>
-            <div className="mt-6 flex flex-col gap-2 text-sm text-white/40">
-              <div className="flex items-center gap-2">
-                <div className="size-1.5 rounded-full bg-emerald-500" />
-                Producer: greenlight viability, comparables, genre fit
+      {/* ── The evidence ── */}
+      <section id="record" className="bg-white text-[#181818]" aria-label="The evidence">
+        <div className="mx-auto max-w-[1280px] px-6 py-24">
+          <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#666]">The evidence</p>
+          <h2 className="mt-4 max-w-2xl text-[40px] font-medium leading-[1.2] tracking-[-0.36px] sm:text-[52px]">
+            Trained on the past. Judged only on the future.
+          </h2>
+          <div className="mt-12 divide-y divide-[#d2d2d2] border-y border-[#d2d2d2]">
+            {[
+              { t: 'Walk-forward validation', d: 'The model trains strictly on films released before each test year — never on the films it judges. Repeated across fourteen rolling folds, retrained from scratch every time.' },
+              { t: 'Naive baselines alongside', d: 'Every internal benchmark sits next to always-say-no and band-average predictors, so we know exactly where the model adds value and where it does not.' },
+              { t: 'Film-by-film record', d: 'A frozen holdout of recent releases with predicted verdict versus actual outcome for every film — available under diligence, not as a headline.' },
+              { t: 'Uncertainty on everything', d: 'Confidence intervals on every score, outcome ranges instead of point estimates, sample sizes printed next to every component.' },
+            ].map((r, i) => (
+              <Reveal key={r.t} delay={i * 90}>
+              <div className="grid gap-2 py-8 sm:grid-cols-[280px_1fr] sm:gap-8">
+                <p className="text-[17px] font-medium text-[#181818]">{r.t}</p>
+                <p className="max-w-2xl text-[15px] leading-relaxed text-[#444]">{r.d}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="size-1.5 rounded-full bg-blue-500" />
-                Financier: capital recovery, risk diagnosis, sensitivity
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/5 bg-zinc-900 p-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="rounded-xl border border-emerald-900/40 bg-emerald-950/20 p-4">
-                <p className="text-xs font-medium text-emerald-400/80">Producer Score</p>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-emerald-400">81</span>
-                  <span className="text-xs text-white/30">/100</span>
-                </div>
-                <div className="mt-3 space-y-1.5">
-                  <div className="h-1.5 rounded-full bg-emerald-500/20"><div className="h-full w-4/5 rounded-full bg-emerald-500" /></div>
-                  <div className="h-1.5 rounded-full bg-emerald-500/20"><div className="h-full w-3/5 rounded-full bg-emerald-400" /></div>
-                  <div className="h-1.5 rounded-full bg-emerald-500/20"><div className="h-full w-2/5 rounded-full bg-emerald-400/60" /></div>
-                </div>
-              </div>
-              <div className="rounded-xl border border-blue-900/40 bg-blue-950/20 p-4">
-                <p className="text-xs font-medium text-blue-400/80">Financier Score</p>
-                <div className="mt-1 flex items-baseline gap-1">
-                  <span className="text-3xl font-bold text-blue-400">74</span>
-                  <span className="text-xs text-white/30">/100</span>
-                </div>
-                <div className="mt-3 space-y-1.5">
-                  <div className="h-1.5 rounded-full bg-blue-500/20"><div className="h-full w-3/4 rounded-full bg-blue-500" /></div>
-                  <div className="h-1.5 rounded-full bg-blue-500/20"><div className="h-full w-1/2 rounded-full bg-blue-400" /></div>
-                  <div className="h-1.5 rounded-full bg-blue-500/20"><div className="h-full w-2/5 rounded-full bg-blue-400/60" /></div>
-                </div>
-              </div>
-            </div>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <div className="rounded-lg bg-white/5 p-2.5 text-center">
-                <p className="text-xs font-medium text-white">10</p>
-                <p className="text-[10px] text-white/40">Components</p>
-              </div>
-              <div className="rounded-lg bg-white/5 p-2.5 text-center">
-                <p className="text-xs font-medium text-white">81</p>
-                <p className="text-[10px] text-white/40">Max Score</p>
-              </div>
-              <div className="rounded-lg bg-white/5 p-2.5 text-center">
-                <p className="text-xs font-medium text-white">93%</p>
-                <p className="text-[10px] text-white/40">Precision</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ───────── Value Prop 2 — Data-backed ───────── */}
-      <section className="bg-black py-20 sm:py-28">
-        <div className="mx-auto grid max-w-5xl items-center gap-12 px-6 lg:grid-cols-2">
-          <div className="order-last lg:order-first">
-            <div className="rounded-2xl border border-white/5 bg-zinc-900 p-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-cyan-500/20">
-                    <Database className="size-4 text-cyan-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">700+ Films</p>
-                    <p className="text-xs text-white/40">Verified financials spanning 2015–2025</p>
-                  </div>
-                </div>
-                <div className="h-px bg-white/5" />
-                <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-purple-500/20">
-                    <BarChart3 className="size-4 text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">10 Scoring Dimensions</p>
-                    <p className="text-xs text-white/40">Genre, talent, budget, pre-sales, seasonality, and more</p>
-                  </div>
-                </div>
-                <div className="h-px bg-white/5" />
-                <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-amber-500/20">
-                    <ShieldCheck className="size-4 text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">93.3% Precision</p>
-                    <p className="text-xs text-white/40">Out-of-sample greenlight accuracy (2023–2025)</p>
-                  </div>
-                </div>
-                <div className="h-px bg-white/5" />
-                <div className="flex items-center gap-3">
-                  <div className="flex size-9 items-center justify-center rounded-lg bg-emerald-500/20">
-                    <TrendingUp className="size-4 text-emerald-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-white">Continuous Model</p>
-                    <p className="text-xs text-white/40">Expected gross multiple scoring vs binary win-rate</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Decisions backed by{' '}
-              <span className="font-serif-accent">data</span>
-            </h2>
-            <p className="mt-4 text-sm leading-relaxed text-white/50">
-              Every component in our scoring engine is derived from empirical distributions of
-              actual box office multiples — not heuristics or expert opinion. We measure what
-              happened, not what someone thinks will happen.
-            </p>
-            <div className="mt-6 flex flex-col gap-2 text-sm text-white/40">
-              <div className="flex items-center gap-2">
-                <div className="size-1.5 rounded-full bg-emerald-500" />
-                Honest out-of-sample testing, not backtest overfitting
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="size-1.5 rounded-full bg-cyan-500" />
-                Continuous model upgraded recall from 22% to 52%
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ───────── Testimonials ───────── */}
-      <section className="overflow-hidden border-y border-white/5 bg-black py-20 sm:py-28">
-        <div className="mx-auto max-w-6xl px-6">
-          <div className="mb-10 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Used by industry{' '}
-              <span className="font-serif-accent">professionals</span>
-            </h2>
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex animate-marquee-left gap-4" style={{ width: 'max-content' }}>
-            {[...testimonials, ...testimonials].map((t, i) => (
-              <div
-                key={`${t.name}-${i}`}
-                className="w-[280px] sm:w-[340px] max-w-[85vw] shrink-0 rounded-xl border border-white/5 bg-zinc-900/50 p-5"
-              >
-                <div className="mb-2 flex gap-0.5">
-                  {[...Array(5)].map((_, j) => (
-                    <Star key={j} className="size-3 fill-amber-500 text-amber-500" />
-                  ))}
-                </div>
-                <p className="text-sm leading-relaxed text-white/70">&ldquo;{t.quote}&rdquo;</p>
-                <div className="mt-3 flex items-center gap-2">
-                  <div className="flex size-7 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
-                    {t.name.split(' ').map(n => n.charAt(0)).join('')}
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-white">{t.name}</p>
-                    <p className="text-[10px] text-white/40">{t.role}</p>
-                  </div>
-                </div>
-              </div>
+              </Reveal>
             ))}
           </div>
-
-          <div className="flex animate-marquee-right gap-4" style={{ width: 'max-content' }}>
-            {[...testimonials, ...testimonials].map((t, i) => (
-              <div
-                key={`${t.name}-r-${i}`}
-                className="w-[280px] sm:w-[340px] max-w-[85vw] shrink-0 rounded-xl border border-white/5 bg-zinc-900/50 p-5"
-              >
-                <div className="mb-2 flex gap-0.5">
-                  {[...Array(5)].map((_, j) => (
-                    <Star key={j} className="size-3 fill-amber-500 text-amber-500" />
-                  ))}
-                </div>
-                <p className="text-sm leading-relaxed text-white/70">&ldquo;{t.quote}&rdquo;</p>
-                <div className="mt-3 flex items-center gap-2">
-                  <div className="flex size-7 items-center justify-center rounded-full bg-white/10 text-xs font-medium text-white">
-                    {t.name.split(' ').map(n => n.charAt(0)).join('')}
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-white">{t.name}</p>
-                    <p className="text-[10px] text-white/40">{t.role}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="mt-16 border-t border-[#303030] pt-12">
+            <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#8f8f8f]">Limits</p>
+            <ul className="mt-6 max-w-2xl space-y-6">
+              {[
+                'It does not know your story. No database of script quality exists — your concept ratings are the only story signal, and the score trusts them.',
+                'It has no pre-sale database. Deal values are your inputs. Optimistic inputs produce optimistic scores; the report shows the split.',
+                'Regime changes fool it. The pandemic years and the recovery broke historical patterns. Any structural shift will do the same.',
+                'On raw point prediction it trails a naive band average. Its edge is ranking and finding winners — not point estimates.',
+              ].map(li => (
+                <li key={li.slice(0, 28)} className="flex gap-4 text-[15px] leading-relaxed text-[#969696]">
+                  <span className="mt-2 size-1 shrink-0 bg-[#da291c]" />
+                  {li}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
       </section>
 
-      {/* ───────── FAQ ───────── */}
-      <section className="bg-zinc-950 py-20 sm:py-28">
-        <div className="mx-auto max-w-3xl px-6">
-          <div className="mb-10 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-              Got{' '}
-              <span className="font-serif-accent">questions?</span>
-            </h2>
-          </div>
-
-          <div className="space-y-3">
+      {/* ── FAQ ── */}
+      <section className="border-t border-[#303030]" aria-label="Questions">
+        <div className="mx-auto max-w-[1280px] px-6 py-24">
+          <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#8f8f8f]">Questions</p>
+          <div className="mt-8 divide-y divide-[#303030] border-y border-[#303030]">
             {faqs.map(f => (
-              <details key={f.q} className="group rounded-xl border border-white/5 bg-zinc-900/50 [&[open]]:border-white/10">
-                <summary className="flex cursor-pointer items-center justify-between px-5 py-4 text-sm font-medium text-white/80 hover:text-white [&::-webkit-details-marker]:hidden">
-                  {f.q}
-                  <ChevronDown className="size-4 shrink-0 text-white/30 transition-transform group-open:rotate-180" />
+              <details key={f.q} className="group py-7">
+                <summary className="flex cursor-pointer list-none items-baseline justify-between gap-6 [&::-webkit-details-marker]:hidden">
+                  <span className="text-[19px] font-medium text-white transition-colors group-hover:text-white">{f.q}</span>
+                  <span className="shrink-0 text-xl text-[#8f8f8f] transition-transform duration-300 group-open:rotate-45">+</span>
                 </summary>
-                <div className="border-t border-white/5 px-5 pb-4 pt-3">
-                  <p className="text-sm leading-relaxed text-white/50">{f.a}</p>
-                </div>
+                <p className="mt-3 max-w-3xl text-[15px] leading-relaxed text-[#969696]">{f.a}</p>
               </details>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ───────── CTA ───────── */}
-      <section className="relative overflow-hidden bg-black py-20 sm:py-28">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_50%_50%,rgba(16,185,129,0.08),transparent_60%)] animate-float" style={{ animationDelay: '-1s' }} />
-        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:60px_60px]" />
-
-        <div className="relative mx-auto flex max-w-3xl flex-col items-center gap-6 px-6 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-            Ready to evaluate a{' '}
-            <span className="font-serif-accent">project?</span>
+      {/* ── Diligence close ── */}
+      <section className="border-t border-[#303030]">
+        <div className="mx-auto max-w-[1280px] px-6 py-24 text-center sm:py-32">
+          <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#8f8f8f]">Diligence</p>
+          <h2 className="mx-auto mt-4 max-w-2xl text-[48px] font-medium leading-[1.2] tracking-[-0.36px] text-white sm:text-[56px] sm:leading-[1.1] sm:tracking-[-1.12px]">
+            Don&apos;t trust the score. Check the record.
           </h2>
-          <p className="max-w-lg text-sm text-white/50">
-            Fill in the film details, talent configuration, and financial structure. Get a comprehensive
-            greenlight score, risk diagnosis, and financial projections in seconds.
+          <p className="mx-auto mt-6 max-w-xl text-[16px] leading-relaxed text-[#969696]">
+            Every prediction we have ever published internally sits in a film-by-film record
+            with outcomes attached. Ask for it before you trust us.
           </p>
-          <Link href="/evaluate">
-            <Button size="lg" className="rounded-full bg-white px-10 text-base text-black hover:bg-white/90">
-              Start Evaluation
-              <ArrowRight className="ml-1 size-4" />
-            </Button>
-          </Link>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+            <Link href="/evaluate">
+              <Button className="h-12 rounded-none bg-[#da291c] px-8 text-[14px] font-bold uppercase tracking-[1.4px] text-white hover:bg-[#b01e0a]">
+                Evaluate a project
+              </Button>
+            </Link>
+            <a
+              href="#record"
+              className="inline-flex h-12 items-center gap-1 border border-white/40 px-8 text-[14px] font-bold uppercase tracking-[1.4px] text-white transition-colors hover:border-white"
+            >
+              How we test <ArrowUpRight className="size-4" />
+            </a>
+          </div>
         </div>
       </section>
 
-      {/* ───────── Footer ───────── */}
-      <footer className="border-t border-white/5 bg-zinc-950">
-        <div className="mx-auto grid max-w-5xl gap-8 px-6 py-12 sm:grid-cols-3">
+      {/* ── Footer ── */}
+      <footer className="border-t border-[#303030]">
+        <div className="mx-auto grid max-w-[1280px] gap-10 px-6 py-16 sm:grid-cols-4">
           <div>
-            <p className="mb-3 text-sm font-semibold text-white">Model</p>
-            <div className="flex flex-col gap-1.5 text-sm text-white/40">
-              <span>Continuous Outcome Model</span>
-              <span>Walk-Forward Validated</span>
+            <p className="flex items-center gap-2.5 text-[13px] font-semibold uppercase tracking-[0.65px] text-white">
+              <span className="inline-block size-2.5 bg-[#da291c]" aria-hidden /> Greenlit
+            </p>
+            <p className="mt-4 max-w-xs text-[13px] leading-relaxed text-[#969696]">
+              Pre-release film investment scoring, validated out-of-sample.
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#8f8f8f]">Product</p>
+            <div className="mt-4 flex flex-col gap-2.5 text-[13px] text-[#969696]">
+              <Link href="/evaluate" className="transition-colors hover:text-white">Evaluate a project</Link>
             </div>
           </div>
           <div>
-            <p className="mb-3 text-sm font-semibold text-white">Company</p>
-            <div className="flex flex-col gap-1.5 text-sm text-white/40">
-              <span>Greenlit</span>
-              <span>Bengaluru, India</span>
-              <a href="mailto:contact@filmrisk.in" className="hover:text-white/70 transition-colors">contact@filmrisk.in</a>
+            <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#8f8f8f]">Method</p>
+            <div className="mt-4 flex flex-col gap-2.5 text-[13px] text-[#969696]">
+              <a href="#standard" className="transition-colors hover:text-white">The standard</a>
+              <a href="#record" className="transition-colors hover:text-white">The evidence</a>
             </div>
           </div>
           <div>
-            <p className="mb-3 text-sm font-semibold text-white">Resource</p>
-            <div className="flex flex-col gap-1.5 text-sm text-white/40">
-              <Link href="/evaluate" className="hover:text-white/70 transition-colors">Evaluate a Project</Link>
-              <span>v2.0 — Continuous Model</span>
+            <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#8f8f8f]">Contact</p>
+            <div className="mt-4 flex flex-col gap-2.5 text-[13px] text-[#969696]">
+              <a href="mailto:saswatasg@gmail.com" className="transition-colors hover:text-white">saswatasg@gmail.com</a>
             </div>
           </div>
         </div>
-        <div className="border-t border-white/5 px-6 py-4 text-center text-xs text-white/30">
-          Greenlit &middot; 2026
+        <div className="border-t border-[#303030]">
+          <div className="mx-auto flex max-w-[1280px] items-center justify-between px-6 py-5 text-[12px] text-[#8f8f8f]">
+            <span>Greenlit · MMXXVI</span>
+            <span>Private preview</span>
+          </div>
         </div>
       </footer>
     </div>
