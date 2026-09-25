@@ -10,6 +10,7 @@ import { Slider } from '@/components/ui/slider'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, ChevronDown, ArrowUpRight } from 'lucide-react'
 import { countRange } from '@/lib/display-ranges'
+import { authHeaders } from '@/lib/client-auth'
 import type { EvaluationInput, EvaluationResult } from '@/lib/types'
 import {
   FLOW_STORAGE_KEY, FLOW_DEFAULTS, GENRES_20, PRODUCTION_HOUSES_21, MONTHS_12,
@@ -56,10 +57,11 @@ const CHIP = 'rounded-none border px-4 py-3 text-left text-sm transition-colors 
 const CHIP_IDLE = 'border-[#303030] bg-transparent text-[#969696] hover:border-[#8f8f8f] hover:text-white'
 const CHIP_ACTIVE = 'border-white/80 bg-white/[0.04] text-white'
 
-export function EvaluateFlow({ onSubmit, loading, initialInput }: {
+export function EvaluateFlow({ onSubmit, loading, initialInput, purchaseNote }: {
   onSubmit: (input: EvaluationInput) => void
   loading: boolean
   initialInput?: EvaluationInput
+  purchaseNote?: string | null
 }) {
   const [tierInfo, setTierInfo] = useState<TierRef | null>(null)
   useEffect(() => { fetch('/api/reference').then(r => r.json()).then(setTierInfo).catch(() => {}) }, [])
@@ -153,10 +155,12 @@ export function EvaluateFlow({ onSubmit, loading, initialInput }: {
     const seq = ++previewSeq.current
     previewTimer.current = setTimeout(async () => {
       try {
+        const headers = authHeaders()
+        if (!headers.Authorization) return
         const res = await fetch('/api/evaluate', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(input),
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ ...input, preview: true }),
         })
         if (!res.ok) return
         const data: EvaluationResult = await res.json()
@@ -200,7 +204,6 @@ export function EvaluateFlow({ onSubmit, loading, initialInput }: {
       setBudgetError('Enter a budget to continue — everything else has a safe default.')
       return
     }
-    try { sessionStorage.removeItem(FLOW_STORAGE_KEY) } catch { /* ignore */ }
     onSubmit(input)
   }
 
@@ -634,6 +637,9 @@ export function EvaluateFlow({ onSubmit, loading, initialInput }: {
               >
                 {loading ? 'Scoring…' : 'Score this film'}
               </Button>
+              {purchaseNote && (
+                <p className="mt-3 text-center text-[13px] leading-relaxed text-[#8f8f8f]">{purchaseNote}</p>
+              )}
             </div>
           )}
         </div>

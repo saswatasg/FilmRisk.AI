@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { invalidateSession } from '@/lib/auth'
+import { extractToken, invalidateSession } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
-  const token = request.headers.get('Authorization')?.replace('Bearer ', '')
+  const token = extractToken(request.headers.get('Authorization')) ?? request.cookies.get('token')?.value ?? null
   if (token) await invalidateSession(token)
-  return NextResponse.json({ ok: true })
+  const res = NextResponse.json({ ok: true })
+  res.cookies.delete('token')
+  res.cookies.delete('email')
+  return res
 }

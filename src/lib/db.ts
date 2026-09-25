@@ -4,14 +4,16 @@ const client = new Client({
   connectionString: process.env.DATABASE_URL,
 })
 
-export async function query<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
+let ready: Promise<void> | null = null
+
+async function rawQuery<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
   const result = await client.query(sql, params)
   return result.rows as T[]
 }
 
-export async function ensureTables() {
+async function ensureTables() {
   await client.connect()
-  await query(`
+  await rawQuery(`
     CREATE TABLE IF NOT EXISTS "User" (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,
@@ -19,7 +21,7 @@ export async function ensureTables() {
       "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `)
-  await query(`
+  await rawQuery(`
     CREATE TABLE IF NOT EXISTS "Session" (
       id TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
@@ -28,7 +30,7 @@ export async function ensureTables() {
       "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `)
-  await query(`
+  await rawQuery(`
     CREATE TABLE IF NOT EXISTS "Purchase" (
       id TEXT PRIMARY KEY,
       "userId" TEXT NOT NULL REFERENCES "User"(id) ON DELETE CASCADE,
@@ -38,8 +40,24 @@ export async function ensureTables() {
       "createdAt" TIMESTAMP NOT NULL DEFAULT NOW()
     )
   `)
-  await query(`CREATE INDEX IF NOT EXISTS idx_session_token ON "Session"(token)`)
-  await query(`CREATE INDEX IF NOT EXISTS idx_purchase_user ON "Purchase"("userId")`)
+  await rawQuery(`ALTER TABLE "Purchase" ADD COLUMN IF NOT EXISTS "runsUsed" INT NOT NULL DEFAULT 0`)
+  await rawQuery(`CREATE INDEX IF NOT EXISTS idx_session_token ON "Session"(token)`)
+  await rawQuery(`CREATE INDEX IF NOT EXISTS idx_purchase_user ON "Purchase"("userId")`)
 }
 
-export { client }
+function ensureReady(): Promise<void> {
+  if (!ready) {
+    ready = ensureTables().catch(err => {
+      ready = null
+      throw err
+    })
+  }
+  return ready
+}
+
+export async function query<T = unknown>(sql: string, params: unknown[] = []): Promise<T[]> {
+  await ensureReady()
+  return rawQuery<T>(sql, params)
+}
+
+export { ensureTables, client }

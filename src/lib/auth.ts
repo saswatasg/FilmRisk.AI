@@ -1,15 +1,23 @@
 import { randomBytes, createHash } from 'crypto'
+import bcrypt from 'bcryptjs'
 import { query } from './db'
 
 const JWT_SECRET: string = process.env.JWT_SECRET ?? 'dev-secret-change-me'
 const TOKEN_BYTES = 32
 
-export function hashPassword(password: string): string {
-  return createHash('sha256').update(password + JWT_SECRET).digest('hex')
+export const MAX_RUNS_PER_PURCHASE = 3
+
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 10)
 }
 
-export function verifyPassword(password: string, hash: string): boolean {
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  if (hash.startsWith('$2')) return bcrypt.compare(password, hash)
   return createHash('sha256').update(password + JWT_SECRET).digest('hex') === hash
+}
+
+export function isLegacyHash(hash: string): boolean {
+  return !hash.startsWith('$2')
 }
 
 export function generateToken(): string {
@@ -17,17 +25,20 @@ export function generateToken(): string {
 }
 
 interface UserRow { id: string; email: string; password: string }
-interface SessionRow { id: string; userId: string }
-interface PurchaseRow { id: string }
+interface PurchaseRow { runsUsed: number }
 
 export async function createUser(email: string, password: string): Promise<{ id: string; email: string }> {
   const id = randomBytes(16).toString('hex')
-  const hashed = hashPassword(password)
+  const hashed = await hashPassword(password)
   await query(
     `INSERT INTO "User" (id, email, password) VALUES ($1, $2, $3)`,
     [id, email, hashed]
   )
   return { id, email }
+}
+
+export async function upgradePassword(userId: string, hashed: string): Promise<void> {
+  await query(`UPDATE "User" SET password = $1 WHERE id = $2`, [hashed, userId])
 }
 
 export async function findUserByEmail(email: string): Promise<UserRow | null> {
@@ -45,52 +56,52 @@ export async function createSession(userId: string, token: string, expiresAt: Da
   )
 }
 
-export async function findSession(token: string): Promise<SessionRow | null> {
-  const rows = await query(
+export async function findSession(token: string): Promise<{ id: string; userId: string } | null> {
+  const rows = await query<{ id: string; userId: string }>(
     `SELECT s.id, s."userId" FROM "Session" s WHERE s.token = $1 AND s."expiresAt" > NOW()`,
     [token]
   )
-  return (rows[0] as SessionRow) ?? null
+  return rows[0] ?? null
 }
 
 export async function invalidateSession(token: string): Promise<void> {
-  await query(`DELETE FROM "Session" WHERE token = $1`, [token])
-}
-
-export async function invalidateUserSessions(userId: string): Promise<void> {
-  await query(`DELETE FROM "Session" WHERE "userId" = $1`, [userId])
+  await query(`DELETE FROM "Session" WHERE "token" = $1`, [token])
 }
 
 export async function createPurchase(userId: string, paymentId: string, amount: number): Promise<string> {
   const id = randomBytes(16).toString('hex')
   await query(
-    `INSERT INTO "Purchase" (id, "userId", "paymentId", amount) VALUES ($1, $2, $3, $4)`,
+    `INSERT INTO "Purchase" (id, "userId", "paymentId", amount, "runsUsed") VALUES ($1, $2, $3, $4, 0)`,
     [id, userId, paymentId, amount]
   )
   return id
 }
 
-export async function hasActivePurchase(userId: string): Promise<boolean> {
-  const rows = await query(
-    `SELECT 1 FROM "Purchase" WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 1`,
+export interface Entitlement {
+  purchased: boolean
+  runsUsed: number
+  editsLeft: number
+}
+
+export async function getEntitlement(userId: string): Promise<Entitlement> {
+  const rows = await query<PurchaseRow>(
+    `SELECT "runsUsed" FROM "Purchase" WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 1`,
+    [userId]
+  )
+  const row = rows[0]
+  if (!row) return { purchased: false, runsUsed: 0, editsLeft: 0 }
+  const runsUsed = Number(row.runsUsed ?? 0)
+  return { purchased: true, runsUsed, editsLeft: Math.max(0, MAX_RUNS_PER_PURCHASE - runsUsed) }
+}
+
+export async function consumeRun(userId: string): Promise<boolean> {
+  const rows = await query<{ runsUsed: number }>(
+    `UPDATE "Purchase" SET "runsUsed" = "runsUsed" + 1
+     WHERE id = (SELECT id FROM "Purchase" WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 1)
+     RETURNING "runsUsed"`,
     [userId]
   )
   return rows.length > 0
-}
-
-export async function markPurchaseEvaluated(purchaseId: string): Promise<void> {
-  await query(
-    `UPDATE "Purchase" SET "evaluatedAt" = NOW() WHERE id = $1 AND "evaluatedAt" IS NULL`,
-    [purchaseId]
-  )
-}
-
-export async function findUserLatestPurchaseId(userId: string): Promise<string | null> {
-  const rows = await query(
-    `SELECT id FROM "Purchase" WHERE "userId" = $1 ORDER BY "createdAt" DESC LIMIT 1`,
-    [userId]
-  )
-  return (rows[0] as { id: string })?.id ?? null
 }
 
 export async function getUserById(userId: string): Promise<{ id: string; email: string } | null> {
@@ -121,4 +132,17 @@ export function verifyToken(token: string): { userId: string } | null {
   } catch {
     return null
   }
+}
+
+export function extractToken(header: string | null): string | null {
+  return header?.replace('Bearer ', '') ?? null
+}
+
+export async function authenticate(token: string | null): Promise<{ userId: string } | null> {
+  if (!token) return null
+  const payload = verifyToken(token)
+  if (!payload) return null
+  const session = await findSession(token)
+  if (!session) return null
+  return { userId: payload.userId }
 }

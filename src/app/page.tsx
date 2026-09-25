@@ -13,11 +13,11 @@ const scope = [
 const faqs = [
   {
     q: 'What do I receive at the end?',
-    a: 'A one-page investment memorandum: the verdict on a green–amber–red gauge with your market percentile, the split between dataset evidence and your own assumptions, simulated outcome ranges, comparable films, diagnosed risks, and what-if levers — downloadable as a PDF to share with partners.',
+    a: 'Everything listed in the section above, as a single one-page PDF you can hand to a partner — including the split between what came from the dataset and what came from your own assumptions.',
   },
   {
     q: 'What does it need from me?',
-    a: 'The project details, your expected pre-sale deals by category, and your honest ratings of the concept. Pre-sale figures and story quality exist nowhere in our data — they are your inputs, benchmarked against market ranges, and the report always shows how much of the score is your assumptions versus historical evidence.',
+    a: 'The project details, your expected pre-sale deals by category, and your honest ratings of the concept. These exist nowhere in our data, so they are yours to supply — and the report is built to show how far your inputs move the score.',
   },
   {
     q: 'How do you handle the fact that most films never publish numbers?',
@@ -67,27 +67,13 @@ export default function Home() {
                 The standard
               </a>
             </div>
-            <ul aria-label="Coverage highlights" className="mt-12 flex flex-wrap gap-2">
-              {[
-                '2,454 films · 2001–2025',
-                '729 verified financials',
-                '14 rolling validation folds',
-                '10 scoring dimensions',
-                '10,000 simulated paths',
-              ].map((b) => (
-                <li key={b}
-                  className="rounded-full border border-[#303030] bg-[#303030] px-3 py-1 text-[11px] font-semibold uppercase tracking-[1.1px] text-white">
-                  {b}
-                </li>
-              ))}
-             </ul>
            </Reveal>
           <Reveal delay={150}>
           <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-12 border-t border-[#303030] pt-12 sm:grid-cols-4">
             {scope.map(s => (
-              <div key={s.l}>
-                <dd className="text-[56px] font-bold leading-none tabular-nums tracking-[-1.12px] text-white">{s.v}</dd>
-                <dt className="mt-3 block text-[13px] leading-relaxed text-[#969696]">{s.l}</dt>
+              <div key={s.l} className="flex flex-col">
+                <dt className="order-2 mt-3 block text-[13px] leading-relaxed text-[#969696]">{s.l}</dt>
+                <dd className="order-1 text-[56px] font-bold leading-none tabular-nums tracking-[-1.12px] text-white">{s.v}</dd>
               </div>
             ))}
           </dl>
@@ -104,9 +90,9 @@ export default function Home() {
           </h2>
           <div className="mt-14 grid gap-px bg-[#303030] sm:grid-cols-3">
             {[
-              { n: '01', t: 'Proven method', d: 'Walk-forward validation across fourteen rolling folds. The model trains strictly on films released before each test year and is retrained from scratch every time — never on the films it judges.' },
-              { n: '02', t: 'Financial-grade output', d: 'A memorandum, not a number. Verdict, market percentile, outcome ranges, comparable films, diagnosed risks, and what-if levers — each traced to its source, each with a sample size.' },
-              { n: '03', t: 'Disclosed uncertainty', d: 'Confidence intervals on every score, outcome ranges instead of point estimates, and an honest accounting of what the data cannot tell you. Survivorship bias is disclosed, not corrected away.' },
+              { n: '01', t: 'Out-of-sample by construction', d: 'Every claim on this page is a prediction made before the outcome was known — never fitted to the films it is later asked to judge.' },
+              { n: '02', t: 'Financial-grade output', d: 'A memorandum, not a number. Ten scoring dimensions, each traced to its source, each printed with a sample size.' },
+              { n: '03', t: 'Nothing overclaimed', d: 'Every number ships with an interval, and what the data cannot tell you is stated on the report itself — not buried in a footnote.' },
             ].map((s, i) => (
               <Reveal key={s.n} delay={i * 110}>
               <div className="bg-[#181818] p-8 transition-colors duration-300 hover:bg-[#202020]">
@@ -133,7 +119,7 @@ export default function Home() {
               { l: 'Market percentile', d: 'Where your project sits in the empirical distribution of scored films.' },
               { l: 'Outcome ranges', d: 'Simulated 10,000-path projections instead of a single point estimate.' },
               { l: 'Risk diagnosis', d: 'Every factor pulling the score down, with severity and what-if sensitivity.' },
-              { l: 'Comparables', d: 'Historically similar films with their outcomes — the raw record behind the ranking.' },
+              { l: 'Comparables', d: 'Historically similar films with what actually happened to them — your project among its peers.' },
               { l: 'Levers', d: 'Which inputs move the needle and by how much — what to test before you commit.' },
             ].map((m, i) => (
               <Reveal key={m.l} delay={i * 80}>
@@ -161,7 +147,7 @@ export default function Home() {
             {[
               { t: 'Walk-forward validation', d: 'The model trains strictly on films released before each test year — never on the films it judges. Repeated across fourteen rolling folds, retrained from scratch every time.' },
               { t: 'Naive baselines alongside', d: 'Every internal benchmark sits next to always-say-no and band-average predictors, so we know exactly where the model adds value and where it does not.' },
-              { t: 'Film-by-film record', d: 'A frozen holdout of recent releases with predicted verdict versus actual outcome for every film — available under diligence, not as a headline.' },
+              { t: 'Film-by-film record', d: 'A frozen holdout of recent releases with predicted verdict versus actual outcome for every film — the raw record behind every claim on this page.' },
               { t: 'Uncertainty on everything', d: 'Confidence intervals on every score, outcome ranges instead of point estimates, sample sizes printed next to every component.' },
             ].map((r, i) => (
               <Reveal key={r.t} delay={i * 90}>
@@ -176,8 +162,8 @@ export default function Home() {
             <p className="text-[11px] font-semibold uppercase tracking-[1.1px] text-[#8f8f8f]">Limits</p>
             <ul className="mt-6 max-w-2xl space-y-6">
               {[
-                'It does not know your story. No database of script quality exists — your concept ratings are the only story signal, and the score trusts them.',
-                'It has no pre-sale database. Deal values are your inputs. Optimistic inputs produce optimistic scores; the report shows the split.',
+                'It does not know your story. Your concept ratings are the only story signal the model ever sees, and it trusts them completely.',
+                'It has no pre-sale database. Deal values are only as good as the numbers you enter, and optimism in your inputs shows up in the score.',
                 'Regime changes fool it. The pandemic years and the recovery broke historical patterns. Any structural shift will do the same.',
                 'On raw point prediction it trails a naive band average. Its edge is ranking and finding winners — not point estimates.',
               ].map(li => (

@@ -1,19 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { findUserByEmail, verifyPassword, createSession, signToken } from '@/lib/auth'
+import { findUserByEmail, verifyPassword, isLegacyHash, upgradePassword, createSession, signToken, hashPassword } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
     const { email, password } = await request.json()
     const user = await findUserByEmail(email)
-    if (!user || !verifyPassword(password, user.password)) {
+    if (!user || !(await verifyPassword(password, user.password))) {
       return NextResponse.json({ error: 'invalid credentials' }, { status: 401 })
     }
-    const rawToken = `jwt_${Date.now()}_${Math.random().toString(36).slice(2)}`
-    const expiresAt = new Date(Date.now() + 86400000)
-    await createSession(user.id, rawToken, expiresAt)
+    if (isLegacyHash(user.password)) {
+      await upgradePassword(user.id, await hashPassword(password))
+    }
     const jwt = signToken({ userId: user.id })
-    return NextResponse.json({ token: jwt, user: { id: user.id, email: user.email } })
-  } catch (err) {
+    await createSession(user.id, jwt, new Date(Date.now() + 86400000))
+    const res = NextResponse.json({ token: jwt, user: { id: user.id, email: user.email } })
+    const opts = { path: '/', maxAge: 86400, sameSite: 'strict' as const }
+    res.cookies.set('token', jwt, opts)
+    res.cookies.set('email', user.email, opts)
+    return res
+  } catch {
     return NextResponse.json({ error: 'login failed' }, { status: 500 })
   }
 }

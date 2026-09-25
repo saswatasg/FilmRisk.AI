@@ -7,6 +7,9 @@ export async function POST(request: NextRequest) {
     if (!email || !password) {
       return NextResponse.json({ error: 'email and password required' }, { status: 400 })
     }
+    if (String(password).length < 8) {
+      return NextResponse.json({ error: 'password must be at least 8 characters' }, { status: 400 })
+    }
     const existing = await createUser(email, password)
     return NextResponse.json({ id: existing.id, email: existing.email }, { status: 201 })
   } catch (err: unknown) {

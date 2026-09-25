@@ -9,35 +9,63 @@ import { analyzeScenarioMoves } from '@/lib/sensitivity-analysis'
 import { computePreSaleBenchmarks } from '@/lib/pre-sale-benchmark'
 import { validateInputBackend, getDataQualityWarnings } from '@/lib/validate-input'
 import { fetchMarketSignals } from '@/lib/market-signals'
-import { verifyToken, hasActivePurchase, markPurchaseEvaluated, findUserLatestPurchaseId } from '@/lib/auth'
+import { authenticate, extractToken, getEntitlement, consumeRun } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
-  const authHeader = request.headers.get('Authorization')
-  const token = authHeader?.replace('Bearer ', '')
-  if (!token) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
-  const payload = verifyToken(token)
-  if (!payload) return NextResponse.json({ error: 'invalid token' }, { status: 401 })
-  if (!(await hasActivePurchase(payload.userId))) {
-    return NextResponse.json({ error: 'purchase required' }, { status: 402 })
-  }
+  const token = extractToken(request.headers.get('Authorization')) ?? request.cookies.get('token')?.value ?? null
+  const payload = await authenticate(token)
+  if (!payload) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
   try {
-    const input: EvaluationInput = await request.json()
-    const validationErrors = validateInputBackend(input)
+    const body = (await request.json()) as EvaluationInput & { preview?: boolean }
+    const { preview, ...rest } = body
+    const isPreview = preview === true
+    const input = rest as EvaluationInput
+
+    if (!isPreview) {
+      const ent = await getEntitlement(payload.userId)
+      if (!ent.purchased) {
+        return NextResponse.json(
+          { error: 'purchase required', code: 'payment_required' },
+          { status: 402 }
+        )
+      }
+      if (ent.editsLeft <= 0) {
+        return NextResponse.json(
+          { error: 'edits exhausted', code: 'edits_exhausted' },
+          { status: 402 }
+        )
+      }
+    }
+
+    const validationErrors = validateInputBackend(input as EvaluationInput)
     if (validationErrors.length > 0) {
       return NextResponse.json({ error: validationErrors.join('; ') }, { status: 400 })
     }
 
     const { films, stats } = loadDataset()
     const marketSignals = await fetchMarketSignals()
-    const greenlight = calculateGreenlightScore(input, stats, marketSignals)
-    const financierRisk = calculateFinancierRisk(input, stats, marketSignals)
-    const comparableFilms = findComparableFilms(input, films, stats, 8)
-    const financialProjection = calculateFinancialProjection(input, stats, greenlight.adjustedScore)
-    const riskDiagnosis = diagnoseRisk(input, stats)
-    const { levers: sensitivities, immaterial: insensitiveLevers } = analyzeScenarioMoves(input, stats)
-    const preSaleBenchmarks = computePreSaleBenchmarks(input)
-    const dataQualityWarnings = getDataQualityWarnings(input, stats)
+    const greenlight = calculateGreenlightScore(input as EvaluationInput, stats, marketSignals)
+
+    if (isPreview) {
+      return NextResponse.json({
+        preview: true,
+        greenlight: {
+          verdict: greenlight.verdict,
+          adjustedScore: greenlight.adjustedScore,
+          realMarketPct: greenlight.realMarketPct,
+          confidenceInterval: greenlight.confidenceInterval,
+        },
+      })
+    }
+
+    const financierRisk = calculateFinancierRisk(input as EvaluationInput, stats, marketSignals)
+    const comparableFilms = findComparableFilms(input as EvaluationInput, films, stats, 8)
+    const financialProjection = calculateFinancialProjection(input as EvaluationInput, stats, greenlight.adjustedScore)
+    const riskDiagnosis = diagnoseRisk(input as EvaluationInput, stats)
+    const { levers: sensitivities, immaterial: insensitiveLevers } = analyzeScenarioMoves(input as EvaluationInput, stats)
+    const preSaleBenchmarks = computePreSaleBenchmarks(input as EvaluationInput)
+    const dataQualityWarnings = getDataQualityWarnings(input as EvaluationInput, stats)
 
     const result: EvaluationResult = {
       projectSummary: {
@@ -61,8 +89,7 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     }
 
-    const purchaseId = await findUserLatestPurchaseId(payload.userId)
-    if (purchaseId) await markPurchaseEvaluated(purchaseId)
+    await consumeRun(payload.userId)
     return NextResponse.json(result)
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
