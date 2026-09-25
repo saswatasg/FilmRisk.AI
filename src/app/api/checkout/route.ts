@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Razorpay from 'razorpay'
 import { verifyToken } from '@/lib/auth'
-
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID!,
-  key_secret: process.env.RAZORPAY_KEY_SECRET!,
-})
 
 const EVALUATION_FEE = 4900
 
@@ -16,7 +10,12 @@ export async function POST(request: NextRequest) {
   if (!payload) return NextResponse.json({ error: 'invalid token' }, { status: 401 })
 
   try {
-    const order = await razorpay.orders.create({
+    const { default: Razorpay } = await import('razorpay')
+    const rzp = new Razorpay({
+      key_id: process.env.RAZORPAY_KEY_ID!,
+      key_secret: process.env.RAZORPAY_KEY_SECRET!,
+    })
+    const order = await rzp.orders.create({
       amount: EVALUATION_FEE,
       currency: 'INR',
       receipt: `eval_${Date.now()}`,
